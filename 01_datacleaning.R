@@ -2,6 +2,12 @@
 library(readxl)
 library(tidyverse)
 
+
+#read.dta() is in the package "foreign", so you will need
+library(foreign)
+drchiv <- read.dta("/Users/camillem/Documents/GitHub/dhs_hbv/Data/CDAR61DT/CDAR61FL.DTA", convert.factors = FALSE)
+# /Users/camillem/Documents/GitHub/dhs_hbv/Data/CDAR61DT
+
 # load data
 dhsmeta <- readRDS("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/DHS_pr_full_merge_backup.rds")
 
@@ -299,7 +305,6 @@ designf_dhs2 <-as_survey_design(designf)
 # overall weighted hbv prevalence
 prop.table(svytable(~catresult, designf_dhs2))
 svyciprop(~catresult, designf_dhs2, method="lo")
-
 
 
 

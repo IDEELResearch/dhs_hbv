@@ -107,12 +107,20 @@ allvars <- c("catresult","shnprovin")
 addmargins(table( kid_dhs_int$shnprovin, kid_dhs_int$catresult,useNA = "always"))
 
 table(kid_dhs_int$sh310a)
+table(kid_dhs_int$catresult)
 
 ##Weighted kids------------------------
 # add weight variable
 kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
 library(survey)
 library(srvyr)
+
+kid_dhs_int <- kid_dhs_int %>% mutate(
+  jaundice = case_when(
+    sh318f == 1 ~ 1,
+    sh318f == 0 ~ 0,
+    is.nan(sh318f) ~ NA_real_))  
+table(kid_dhs_int$jaundice, kid_dhs_int$hbvresult, useNA = "always")
 
 # make survey design object
 designf <-svydesign(ids=kid_dhs_int$hv001, strata=kid_dhs_int$hv022 , weights=kid_dhs_int$hh_weight,  data=kid_dhs_int)
@@ -165,14 +173,39 @@ survmean("hhmem_n")
 
 # categorical data
 catvars <- c("catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
+# other variables of interest: hv026 (place of residence: 0=capital, large city, 1=small city, 2=town, 3=countryside, 9=missing)
+# 
+table(adults2023int$hv041, adults2023int$hbvresult)
+table(adults2023int$hc16, useNA = "always")
+
+# investigate further the two questions on marital status/union - check those with NaN are low age?
+table(adults2023int$ha60, adults2023int$hv115, useNA = "always")
+table(adults2023int$hb60, adults2023int$hv115, useNA = "always")
+table(adults2023int$ha60, adults2023int$hb60, useNA = "always")
+table(adults2023int$ha60, useNA = "always")
+
+checkmarital <- adults2023int %>% filter(ha60=="NaN") # ha60 is female reporting and hb60 is male reporting
+table(checkmarital$hv105)
+
+table(kid_dhs_int$hv105)
+table(kid_dhs_int$ha57)
 
 survtable_all("totalkidpos_f") 
 survtable("totalkidpos_f")
 svytotal(~totalkidpos_f, designf_dhs2, na.rm=T, survey.lonely.psu="adjust")
 svyby(~totalkidpos_f,~hbvresultlowna, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")
 
-survtable_all("hv104") # 1 male, 2 female
-survtable("hv104")
+table(kid_dhs_int$sh318f, useNA = "always")
+survtable_all("sh318f") # 1 male, 2 female
+survtable("sh318f")
+svyby(~sh318f,~hbvresultlowna, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")
+
+table(kid_dhs_int$sh318g,kid_dhs_int$hbvresult, useNA = "always")
+survtable_all("sh318g") # 1 male, 2 female
+survtable("sh318g")
+svyby(~hbvresult,~sh318g, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")
+
+table(kid_dhs_int$shnprovin, kid_dhs_int$hbvresult,kid_dhs_int$hv104 ,useNA = "always")
 
 # province
 survtable_all("shnprovin") #
@@ -245,6 +278,133 @@ adults2023int %>% count(totalkidpos,catresult,case)
 # analyze as categorical since median would be 0
 adults2023int$totalkidpos_f <- as.character(adults2023int$totalkidpos)
 
+table(adults2023int$totalkidpos_f, adults2023int$case5final)
+
+#add HIV
+drchiv$hiv01 <- tolower(drchiv$hiv01)
+drchiv_sel <- drchiv %>% filter(hiv01 %in% adults2023int$dbsbarcode)
+drchiv_sel$dbsbarcode <- drchiv_sel$hiv01
+adults2023int_hiv <- left_join(adults2023int,drchiv_sel, by="dbsbarcode")
+
+table(adults2023int_hiv$hiv03, adults2023int_hiv$hbvresult, useNA = "always")
+table(adults2023int_hiv$shnprovin, adults2023int_hiv$hiv03,useNA = "always")
+
+drchiv$hh_weight <- drchiv$hiv05/1000000
+
+adults2023int_hiv$cluster_hh_2 <- paste(adults2023int_hiv$hivclust, adults2023int_hiv$hivnumb,sep = "_")
+adults2023int_hiv %>% head(cluster_hh, cluster_hh_2)
+
+# Weighted
+adults2023int_hiv$hh_weight <- as.numeric(adults2023int_hiv$hv005)/1000000
+adults2023int_hiv$hbvresult <- as.factor(adults2023int_hiv$hbvresult)
+adults2023int_hiv$hiv03 <- as.factor(adults2023int_hiv$hiv03)
+
+library(survey)
+library(srvyr)
+
+# make survey design object
+designf_ad <-svydesign(ids=adults2023int_hiv$hv001, strata=adults2023int_hiv$hv022 , weights=adults2023int_hiv$hh_weight,  data=adults2023int_hiv)
+options(survey.lonely.psu="adjust")
+designf_dhs2_ad <-as_survey_design(designf_ad)
+
+# basic stats
+# overall weighted hbv prevalence among children with results
+prop.table(svytable(~hbvresult, designf_dhs2_ad))
+svyciprop(~hbvresult, designf_dhs2_ad, method="lo")
+
+# which to have as columns - exposure status ("case")
+table(adults2023int_hiv$hbvresult, adults2023int_hiv$case5final)
+# create functions to calculate weighted n
+# running functions pastes the results to clipboard which you can then copy into excel
+
+# counts for all n in dataset
+survtable_all_ad <- function(var){ 
+  svytotal(as.formula(paste0('~', var)), designf_dhs2_ad, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+}
+
+# counts for n in dataset, stratified by HBV Y or N
+survtable_ad <- function(var){ 
+  svyby(as.formula(paste0('~', var)),~case5final, designf_dhs2_ad, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+}
+
+# mean for continous vars in dataset
+survmean_all_ad <- function(var){ 
+  svymean(as.formula(paste0('~', var)),designf_dhs2_ad, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+}
+
+# mean for continuos vars in dataset, stratified by HBV Y or N
+survmean_ad <- function(var){ 
+  svyby(as.formula(paste0('~', var)),~case5final, designf_dhs2_ad, svymean, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+}
+
+# get results for vars of interest
+survtable_all_ad("catresult") # overall n
+
+# continuous data: hhmem_n (number of household members), agenum (age)
+survtable_all_ad("agenum")
+survmean_ad("agenum")
+
+survmean_all_ad("hhmem_n") 
+survmean_ad("hhmem_n")
+
+# categorical data
+catvars <- c("catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
+
+
+
+survtable_all_ad("hv104") # 1 male, 2 female
+survtable_ad("hv104")
+
+table(adults2023int$hv025)
+survtable_all_ad("hv025") # hv025=urban(1)/rural(2)
+survtable_ad("hv025")
+
+survtable_all_ad("hv270") # wealth
+survtable_ad("hv270")
+
+table(adults2023int$pfldh)
+survtable_all_ad("pfldh") # 
+survtable_ad("pfldh")
+
+survtable_all_ad("pv18s") # 
+survtable_ad("pv18s")
+
+survtable_all_ad("po18s") # 
+survtable_ad("po18s")
+
+survtable_all_ad("po18s") # 
+survtable_ad("po18s")
+
+survtable_all_ad("hbvresult") # 
+survtable_ad("hbvresult")
+
+survtable_all_ad("hiv03") # hiv
+survtable_ad("hiv03")
+
+survtable_all_ad("ha54") # 
+survtable_ad("ha54")
+table(adults2023int$ha54, adults2023int$hbvresult, adults2023int$hv104)
+
+survtable_all_ad("ha57") # 
+survtable_ad("ha57")
+table(adults2023int$ha57, adults2023int$hbvresult)
+
+table(adults2023int$case5final)
+table(adults2023int$pfldh)
+table(adults2023int$pv18s)
+table(adults2023int$po18s_adult) 
+table(adults2023int$po18s)
+
+# province
+survtable_all_ad("shnprovin") #
+survtable_ad("shnprovin") # not working - too small of counts?
+
+table(kid_dhs_int$shnprovin, kid_dhs_int$hbvresultlowna)%>% clipr::write_clip()
+table(kid_dhs_int$hv024, kid_dhs_int$hbvresultlowna)%>% clipr::write_clip()
+svyby(~shnprovin,~hbvresultlowna, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust",covmat=TRUE) # %>% clipr::write_clip()
+
+svytable(~ shnprovin + case5final, designf_dhs2_ad) %>% clipr::write_clip()
+
 
 
 # create table one vars
@@ -260,6 +420,8 @@ print(k08_int_2023_adults, nonnormal = allvars , exact = allvars ,quote = FALSE,
 k08_int_2023_adults <- print(k08_int_2023_adults, nonnormal = allvars , exact = allvars ,quote = FALSE, noSpaces = TRUE, varLabels = T  ,printToggle = FALSE, showAllLevels = TRUE)
 ## Save to a CSV file
 write.csv(k08_int_2023_adults, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/k08_int_2023_adults.csv")
+
+
 
 # Map-------------------------
 library(sf)
@@ -496,14 +658,14 @@ nrow(adults2023int)
 nrow(adults2023int_wdrop)
 
 
-
 # redo sf geometry
 adults2023int_dropsf = st_as_sf(adults2023int_wdrop[!is.na(adults2023int_wdrop$latnum) &!is.na(adults2023int_wdrop$longnum),], coords = c("longnum", "latnum"), crs = 4326) 
 # check
 head(adults2023int_dropsf$geometry)
-nogpsad <- adults2023int_wdrop %>% filter(!(cluster_hh %in% adults2023int_dropsf$cluster_hh)) %>% select(c("cluster_hh","latnum", "longnum","shnprovin","adm1fips","adm1name","catresult" ))
+nogpsad <- adults2023int_wdrop %>% filter(!(cluster_hh %in% adults2023int_dropsf$cluster_hh)) %>% dplyr::select(c("cluster_hh","latnum", "longnum","shnprovin","adm1fips","adm1name","catresult" ))
 
-table(adults2023int$case5final)
+table(adults2023int_wdrop$case5final, useNA = "always")
+table(adults2023int_dropsf$case5final, useNA = "always")
 
 # subset cluster level proportions
 output_df_ad <- adults2023int_dropsf %>% #filter(case5final != 9) %>% 
@@ -555,7 +717,7 @@ A1 <- ggplot() +
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA))
-
+A1
 #adult prev by case and control hhs
 output_df_ad_case <- adults2023int_dropsf %>% filter(case5final == 1) %>% 
   group_by(hv001) %>%
@@ -574,7 +736,7 @@ B1 <- ggplot() +
   geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
   geom_sf(data=DRC, fill="cornsilk") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_df_ad_case, aes(color=(adultprev)), alpha=0.8) + 
+  geom_sf(data=output_df_ad_case[output_df_ad_case$adultprev > 0,], aes(color=(adultprev)), alpha=0.8) + 
   #labs(color='HBV prevalence \nin children < 5') + 
   theme_bw(base_size=14) + 
   #scale_color_brewer(palette = 'Reds') + 
@@ -589,14 +751,14 @@ B1 <- ggplot() +
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA))
-
+B1
 # prev among control hhs
-C1 <- 
+#C1 <- 
   ggplot() + 
   geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
   geom_sf(data=DRC, fill="cornsilk") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_df_ad_control, aes(color=(adultprev)), alpha=0.8) + 
+  geom_sf(data=output_df_ad_control[output_df_ad_control$adultprev > 0,], aes(color=(adultprev)), alpha=0.8) + 
   labs(color='HBV prevalence \nin adults') + 
   theme_bw(base_size=14) + 
   #scale_color_brewer(palette = 'Reds') + 
@@ -664,5 +826,216 @@ ggplot()+
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA))
+
+# Adults kriging---------------------------
+# fit for cases, df: output_df_ad_case
+# and controls, df: output_df_ad_control
+# kriging using gstat: https://rpubs.com/nabilabd/118172 
+# https://mgimond.github.io/Spatial/interpolation-in-r.html#generate-the-variance-and-confidence-interval-maps
+
+output_df_ad_case
+
+output_adca <- output_df_ad_case %>% 
+  group_by(hv001) %>%
+  dplyr::summarize(n=n(),
+                   npos = sum(hbvresultlowna==1),
+                   prev = mean(hbvresultlowna, na.rm=T)*100,
+                   tetcovlower = mean(shtetaindasno, na.rm=T)*100,
+                   tetcovupper = mean(shtetaindasyes, na.rm=T)*100)
+output_df_ad_control <- adults2023int_dropsf %>% filter(case5final == 0) %>% 
+  group_by(hv001) %>%
+  dplyr::summarize(n=n(),
+                   poscount = sum(hbvresult==1),
+                   negcount = sum(hbvresult==0),
+                   adultprev = mean(hbvresult, na.rm=T)*100)
+
+output_points_adca <- st_join(output_df_ad_case, DRC, join = st_intersects) %>% filter(!is.na(Country))
+output_points_adco <- st_join(output_df_ad_control, DRC, join = st_intersects) %>% filter(!is.na(Country))
+
+# make variogram
+m.vgm <- gstat::variogram(adultprev~1, output_points_adca)
+plot(m.vgm)
+# fit a model to the sample variogram
+# https://gisgeography.com/semi-variogram-nugget-range-sill/
+m.fit <- gstat::fit.variogram(m.vgm, model=vgm(psill=1200,"Exp",range=500, nugget=600))
+
+# plot
+plot(m.vgm,m.fit)
+
+# simple kriging
+spDRC <- as_Spatial(DRC)
+grd <- makegrid(spDRC, n = 50000)# making grid of points
+colnames(grd) <- c('x','y')
+grd_pts <- SpatialPoints(coords = grd, 
+                         proj4string=CRS(proj4string(spDRC)))
+
+# find all points in `grd_pts` that fall within DRC outline
+grd_pts_in <- grd_pts[spDRC, ]
+
+# transform grd_pts_in back into a data frame
+gdf <- as.data.frame(coordinates(grd_pts_in)) 
+
+# conduct kriging: household hbv prev
+m.kriged <- gstat::krige(adultprev~1, output_points_adca, st_as_sf(grd_pts_in), model=m.fit)
+summary(m.kriged$var1.pred)
+
+# assign points into bins
+krige <- m.kriged %>% cbind(gdf$x, gdf$y) %>% mutate(
+  #var1.pred = cut(var1.pred, breaks=seq(0,15,by=1)), 
+  var1.pred_cut = case_when(
+    var1.pred <= 0 ~ 0,
+    var1.pred > 0 & var1.pred <= 2 ~ 2,
+    var1.pred > 2 & var1.pred <= 7 ~ 7,
+    var1.pred > 7 & var1.pred ~ 9),
+  var1.pred_largegrp = cut(var1.pred, breaks = seq(0,14, by=1)),
+  var1.pred_largegrp = ifelse(is.na(var1.pred_largegrp),0,var1.pred_largegrp),
+  var1.pred_largegrp2 = cut(var1.pred, breaks = seq(0,14, by=2)),
+  var1.pred_largegrp2 = ifelse(is.na(var1.pred_largegrp2),0,var1.pred_largegrp2),
+  #var1.pred_largegrp2 = cut(var1.pred, breaks = c(0,1,2,3,4,5,6,7,8,9,10), include.lowest = T),
+  se = sqrt(var1.var),
+  se = cut(se, breaks=seq(0,24,by=4))) %>% filter(!is.na(var1.pred))
+
+table(krige$var1.pred_cut)
+table(krige$var1.pred_cut,krige$var1.pred_largegrp, useNA = "always")
+table(krige$var1.pred_largegrp2, useNA = "always")
+
+# factor for prev
+ggplot() + 
+  geom_tile(data=(krige %>% as.data.frame), aes(x=gdf.x,y=gdf.y,fill=as.factor(var1.pred_cut))) + 
+  geom_sf(data=admin0 %>% filter(ISO != 'COD'), fill="cornsilk2", color="cornsilk3") +
+  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
+  labs(fill="Predicted HBV \nprevalence, \nchildren ≤5", x='', y='') + 
+  theme_bw(base_size=14) + 
+  scale_fill_manual(values = c("#3288BD","#FFFFBF","#FDAE61", "#9E0142") , labels=c("0","≤2%","2-7%",">7%")) +
+  #scale_fill_brewer(palette ="Spectral", direction=-1 , labels=c("0","≤2%","2-7%",">7%")) +
+  scale_x_continuous(limits=c(12,31)) + 
+  scale_y_continuous(limits=c(-13.5,5.4)) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.ticks=element_blank(), 
+        axis.text.x=element_blank(), 
+        axis.text.y=element_blank(),
+        panel.background = element_rect(fill="#daeff8", color=NA))
+
+B <- 
+  ggplot() + 
+  geom_tile(data=(krige %>% as.data.frame), aes(x=gdf.x,y=gdf.y,fill=as.factor(var1.pred_largegrp2))) + 
+  geom_sf(data=admin0 %>% filter(ISO != 'COD'), fill="cornsilk2", color="cornsilk3") +
+  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
+  labs(fill="Predicted HBV \nprevalence, \nchildren ≤5", x='', y='') + 
+  theme_bw(base_size=14) + 
+  scale_fill_brewer(palette ="Spectral", direction=-1, labels=c("0","1-2","3-4","5-6","7-8","9-10","11-12","13-14"))+
+  scale_x_continuous(limits=c(12,31)) + 
+  scale_y_continuous(limits=c(-13.5,5.4)) + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.ticks=element_blank(), 
+        axis.text.x=element_blank(), 
+        axis.text.y=element_blank(),
+        panel.background = element_rect(fill="#daeff8", color=NA))
+ggsave("./Plots/krighbvprev.png", width = 9, height = 6)
+
+# Exploratory DA---------------------
+# kids: kid_dhs_int
+# adults: adults2023int
+
+summary(output_points_adca$adultprev)
+hist(output_points_adca$adultprev)
+
+table(kid_dhs_int$hbvresultlowna)
+table(kid_dhs_int$hbvresultlowna)
+
+# output_df_ad_case, output_df_ad_control
+table(adults2023int$case5final)
+table(adults2023int$hbvresult)
+
+hist(adults2023int$hbvresult)
+
+test <- adults2023int %>% group_by(cluster_hh) %>% dplyr::summarize(n=n(),
+                                                              poscount = sum(hbvresult==1),
+                                                              negcount = sum(hbvresult==0),
+                                                              adultprev = mean(hbvresult, na.rm=T)*100)
+View(test)
+nrow(test)
+nrow(adults2023int)
+# add case-control status to cluster_hh
+test <- left_join(test, adults2023int[,c("cluster_hh","case5final")], by="cluster_hh")
+
+hist(test$adultprev)
+hist(test$poscount)
+
+test %>% 
+  ggplot()+
+  geom_histogram(aes(poscount), binwidth = 1)+
+  theme_bw()+
+  facet_wrap(~as.factor(case5final))
+
+test %>% 
+  ggplot()+
+  geom_histogram(aes(adultprev), binwidth = 5)+
+  theme_bw()+
+  facet_wrap(~as.factor(case5final))
+
+table(adults2023int$hbvresult)
+hhwcases <- adults2023int_hiv %>% filter(hbvresult==1 & case5final==1) # case households with case in adults
+hhwcases <- adults2023int_hiv %>% filter(case5final==1) # all case households
+View(hhwcases)
+
+hhwcases <- hhwcases %>% 
+  dplyr::mutate(reltoheadhh=factor(
+    hhwcases$hv101, 
+    levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,98),
+    labels = c("Head", "Spouse","Son/daughter","Son/daughter-in-law","Grandchild","Parent","In-laws","Brother/sister","Co-spouse","Other","Adopted/in custody","Not related","Nephew/niece","Nephew/niece by marriage","Don't know")))
+
+hhwcases <- hhwcases %>% 
+  dplyr::mutate(prov2015=factor(
+    hhwcases$shnprovin, 
+    levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26),
+    labels = c("Kinshasa", "Kwango","Kwilu","Mai-Ndombe","Kongo Central","Equateur","Mongala","Nord-Ubangi","Sud-Ubangi","Tshuapa","Kasai","Kasai-Central","Kasai-Oriental","Lomami","Sankuru","Haut-Katanga","Haut-Lomami","Lualaba","Tanganyka","Maniema","Nord-Kivu","Bas-Uele","Haut-Uele","Ituri","Tshopo","Sud-Kivu")))
+
+hhwcases <- hhwcases %>% 
+  dplyr::mutate(sex=factor(
+    hhwcases$hv104, 
+    levels = c(1, 2),
+    labels = c("Male", "Female")))
+# deep dive on households
+hhwcases %>% count(cluster_hh)
+hhwcases %>% reframe(cluster_hh,totalkidpos, hv105, sex,reltoheadhh,prov2015,hbvresult)
+
+# add kids
+table(kid_dhs_int$catresult)
+table(kids2023$case5final)
+
+kidscase <- kid_dhs_int %>% filter(cluster_hh %in% hhwcases$cluster_hh)
+kidscase$hbvresult <- as.factor(kidscase$hbvresult)
+class(kidscase$hbvresult)
+class(hhwcases$hbvresult)
+
+hhwcases_kids <- bind_rows(hhwcases,kidscase)
+
+hhwcases_kids %>% reframe(cluster_hh,totalkidpos, hv105, sex,reltoheadhh,prov2015,hbvresult)
+table(hhwcases_kids$reltoheadhh, useNA = "always")
+
+hhwcases_kids <- hhwcases_kids %>% 
+  dplyr::mutate(reltoheadhh=factor(
+    hhwcases_kids$hv101, 
+    levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,98),
+    labels = c("Head", "Spouse","Son/daughter","Son/daughter-in-law","Grandchild","Parent","In-laws","Brother/sister","Co-spouse","Other","Adopted/in custody","Not related","Nephew/niece","Nephew/niece by marriage","Don't know")))
+
+hhwcases_kids <- hhwcases_kids %>% 
+  dplyr::mutate(sex=factor(
+    hhwcases_kids$hv104, 
+    levels = c(1, 2),
+    labels = c("Male", "Female")))
+hhwcases_kids <- hhwcases_kids %>% 
+  dplyr::mutate(prov2015=factor(
+    hhwcases_kids$shnprovin, 
+    levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26),
+    labels = c("Kinshasa", "Kwango","Kwilu","Mai-Ndombe","Kongo Central","Equateur","Mongala","Nord-Ubangi","Sud-Ubangi","Tshuapa","Kasai","Kasai-Central","Kasai-Oriental","Lomami","Sankuru","Haut-Katanga","Haut-Lomami","Lualaba","Tanganyka","Maniema","Nord-Kivu","Bas-Uele","Haut-Uele","Ituri","Tshopo","Sud-Kivu")))
+
+hhwcases_kids <- hhwcases_kids %>% arrange(prov2015,desc(totalkidpos))
+hhtrees <- hhwcases_kids %>% reframe(cluster_hh,totalkidpos, hv105, sex,reltoheadhh,prov2015,hbvresult) 
+
+
 
 
