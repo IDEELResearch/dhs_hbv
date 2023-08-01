@@ -111,6 +111,10 @@ table(kid_dhs_int$catresult)
 
 ##Weighted kids------------------------
 # add weight variable
+nrow(kid_dhs_int)
+kid_dhs_int <- kid_dhs_int %>% filter(hv105 != "27")
+nrow(kid_dhs_int)
+
 kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
 library(survey)
 library(srvyr)
@@ -230,7 +234,10 @@ kid_dhs_int <- kid_dhs_int %>% mutate(originalcallclean = case_when(
 addmargins(table(kid_dhs_int$originalcall, kid_dhs_int$originalcallclean))
 table(kid_dhs_int$shnprovin, kid_dhs_int$originalcallclean)%>% clipr::write_clip()
 
-# resuming weighted counts "hv025","hv270", "hv228", "pfldh_kids"
+# resuming weighted counts "hv025","hv270", "hv228", "pfldh_kids", hv105 (1-year age)
+
+survtable_all("hv105") #
+survtable("hv105") #
 
 survtable_all("hv025") #
 survtable("hv025") #
@@ -259,6 +266,8 @@ kid_dhs_int <- kid_dhs_int %>% mutate(
 
 table(kid_dhs_int$shtetaindasyes, useNA = "always")
 table(kid_dhs_int$shtetaindasno, useNA = "always")
+
+# age by province by hbv
 
 #ADULTS ------------------------------
 adults2023int <- k08_nomiss_cc %>% filter(agegrp =="adult") #don't use k08_nomiss - doesn't have updated case/control status based on s/co 5

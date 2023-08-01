@@ -18,8 +18,15 @@ designf <-svydesign(ids=kid_dhs_int$hv001, strata=kid_dhs_int$hv022 , weights=ki
 options(survey.lonely.psu="adjust")
 designf_dhs2 <-as_survey_design(designf)
 
-catvars <- c("catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
-survtable_all_ad("hbvresult") # 
+# vars to run - c("hbvresult","catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
+table(kid_dhs_int$hbvresult, kid_dhs_int$catresult)
+
+table(kid_dhs_int$hv105)
+# age
+kid_age <- svyglm(hbvresult ~ as.factor(hv105), designf_dhs2, family=quasibinomial("log"))
+kid_age <- svyglm(hbvresult ~ as.factor(hv105), designf_dhs2, family=quasibinomial("identity"))
+summary(kid_age)
+confint(kid_age)
 
 # sex
 kid_mf <- svyglm(hbvresult ~ as.factor(hv104), designf_dhs2, family=quasibinomial("log"))
@@ -27,22 +34,61 @@ kid_mf <- svyglm(hbvresult ~ as.factor(hv104), designf_dhs2, family=quasibinomia
 summary(kid_mf)
 confint(kid_mf)
 
-# 
+# urban rural
 kid_urb <- svyglm(hbvresult ~ as.factor(hv025), designf_dhs2, family=quasibinomial("log"))
 kid_urb <- svyglm(hbvresult ~ as.factor(hv025), designf_dhs2, family=quasibinomial("identity"))
 summary(kid_urb)
 confint(kid_urb)
 
+# large/small city/town/countryside
+kid_loc <- svyglm(hbvresult ~ as.factor(hv026), designf_dhs2, family=quasibinomial("log"))
+kid_loc <- svyglm(hbvresult ~ relevel(as.factor(hv026), ref="2"), designf_dhs2, family=quasibinomial("identity"))
+summary(kid_loc)
+confint(kid_loc)
+
+# wealth
+kid_weal <- svyglm(hbvresult ~ as.factor(hv270), designf_dhs2, family=quasibinomial("log"))
+kid_weal <- svyglm(hbvresult ~ as.factor(hv270), designf_dhs2, family=quasibinomial("identity"))
+summary(kid_weal)
+confint(kid_weal)
+
+# wealth
+kid_pf <- svyglm(hbvresult ~ as.factor(pfldh_kids), designf_dhs2, family=quasibinomial("log"))
+kid_pf <- svyglm(hbvresult ~ as.factor(pfldh_kids), designf_dhs2, family=quasibinomial("identity"))
+summary(kid_pf)
+confint(kid_pf)
+
+table(kid_dhs_int$pfldh_kids, kid_dhs_int$hbvresult)
+
+# jaundice
+kid_jau <- svyglm(hbvresult ~ as.factor(jaundice), designf_dhs2, family=quasibinomial("log"))
+kid_jau <- svyglm(hbvresult ~ as.factor(jaundice), designf_dhs2, family=quasibinomial("identity"))
+summary(kid_jau)
+confint(kid_jau)
+table(kid_dhs_int$jaundice, kid_dhs_int$hbvresult)
+
+# jaundice
+kid_tet <- svyglm(hbvresult ~ as.factor(shteta), designf_dhs2, family=quasibinomial("log"))
+kid_tet <- svyglm(hbvresult ~ as.factor(shteta), designf_dhs2, family=quasibinomial("identity"))
+summary(kid_tet)
+confint(kid_tet)
+
+# province - shnprovin too many groups, provgrp_kin (8 levels), provgrp (7 levels)
+kid_prov <- svyglm(hbvresult ~ as.factor(provgrp), designf_dhs2, family=quasibinomial("log"))
+kid_prov <- svyglm(hbvresult ~ as.factor(provgrp_kin), designf_dhs2, family=quasibinomial("identity")) # not converging
+summary(kid_prov)
+confint(kid_prov)
+
 # code var for other kid pos in hh
 kid_clust <- svyglm(hbvresult ~ as.factor(totalkidpos_f), designf_dhs2, family=quasibinomial("log"))
 kid_clust <- svyglm(hbvresult ~ as.factor(totalkidpos_f), designf_dhs2, family=quasibinomial("identity"))
-summary(kid_mf)
-confint(kid_mf)
+summary(kid_clust)
+confint(kid_clust)
 
 # adjusted?
-cat5_adj <- svyglm(pfldh_adult ~ as.factor(cattleherd5)+ modernhousing + sex + 
-                     treatedbednet + urbanrural + hv270, designf_dhs2, family=quasibinomial("log")) # identity NOT CONVERGING
-
+kid_adj <- svyglm(hbvresult ~  as.factor(shteta) + as.factor(pfldh_kids), designf_dhs2, family=quasibinomial("log")) # 
+summary(kid_adj)
+confint(kid_adj)
 
 
 # adults

@@ -290,6 +290,38 @@ k08_nomiss  %>% count(catresult)
 k08_nomiss %>% group_by(agegrp)  %>% count(catresult) 
 k08_nomiss %>% group_by(shnprovin)  %>% count(catresult) 
 
+# DRC province groupings
+# kinshasa, kongo central, bandundu (driving distance)
+# Equateur
+# kasais
+# Katanga
+# orientale
+# Kivus
+# maniema
+class(kid_dhs_int$hv024)
+
+kid_dhs_int <- kid_dhs_int %>% mutate(provgrp = case_when(
+  hv024 == "1" | hv024 == "2" | hv024 == "3" ~ 1,  #kinshasa, kongo central, bandundu (driving distance)
+  hv024 == "4" ~ 2,  # Equateur
+  hv024 == "5" | hv024 == "6" ~ 3,  # kasais
+  hv024 == "7" ~ 4,   # Katanga
+  hv024 == "8" ~ 5,# orientale
+  hv024 == "9" |  hv024 == "11"  ~ 6,# Kivus
+  hv024 == "10" ~ 7# maniema
+  ),
+  provgrp_kin = case_when(
+    hv024 == "1"  ~ 1,  #kinshasa,  (capital)
+    hv024 == "2" | hv024 == "3" ~ 2,  # kongo central, bandundu (driving distance)
+    hv024 == "4" ~ 3,  # Equateur
+    hv024 == "5" | hv024 == "6" ~ 4,  # kasais
+    hv024 == "7" ~ 5,   # Katanga
+    hv024 == "8" ~ 6,# orientale
+    hv024 == "9" |  hv024 == "11"  ~ 7,# Kivus
+    hv024 == "10" ~ 8# maniema
+  ))
+table(kid_dhs_int$provgrp, test$hv024)
+table(test$provgrp_kin, test$hv024)
+
 k08_nomiss$hv005 <- as.numeric(k08_nomiss$hv005)
 k08_nomiss$hh_weight <- k08_nomiss$hv005/1000000
 library(survey)
