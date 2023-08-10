@@ -339,5 +339,123 @@ prop.table(svytable(~catresult, designf_dhs2))
 svyciprop(~catresult, designf_dhs2, method="lo")
 
 
+## nutritional status-------
+# explore
+
+# from https://dhsprogram.com/data/Guide-to-DHS-Statistics/Nutritional_Status.htm
+# hv103 Slept last night
+# hc1 Child's age in months
+# hc70 Height/Age standard deviation (new WHO)
+# hc71 Weight/Age standard deviation (new WHO)
+# hc72 Weight/Height standard deviation (new WHO)
+
+# anemia hc57
+table(kid_dhs_int$hc57)
+# iodine
+table(kid_dhs_int$hv234a)
+
+# hc70 Height/Age standard deviation (new WHO)
+# stunting defined as child <5 with height-for-age z score < -2 SD away from median of WHO 2007 ref pop
+kid_dhs_int$hc70 <- as.numeric(kid_dhs_int$hc70)
+kid_dhs_int$hc70_r <- kid_dhs_int$hc70/100
+hist(kid_dhs_int$hc70)
+
+kid_dhs_int %>% #filter(hc70_r <25) %>% 
+  ggplot()+
+  geom_histogram(aes(x=hc70))+ #, fill=shnprovin)
+  geom_vline(xintercept=-200) # stunting line
+
+### indicator for stunting ----
+table(kid_dhs_int$hc70, useNA = "always")
+kid_dhs_int$hc70 <- as.numeric(kid_dhs_int$hc70) # stunting
+kid_dhs_int$hc71 <- as.numeric(kid_dhs_int$hc71) # under/overweight
+kid_dhs_int$hc72 <- as.numeric(kid_dhs_int$hc72) # wasting
+
+kid_dhs_int <- kid_dhs_int %>% mutate(
+  sevstunt = case_when(
+    hc70 < -300 ~ 1, # severe stunting defined as ht/age <3 SDs; hc70 has been multipled by 100
+    hc70 >= -300 & hc70 < 2000 ~ 0, # not severe; excludes the 9997 and up that are out of range
+    hc70 >=2000 ~ 9, # set to 9 to include as separate category if desired
+    is.nan(hc70) ~ NA_real_, # set NaNs to missing
+    TRUE ~ NA_real_),
+  modstunt = case_when(
+    hc70 < -200 ~ 1, # mod-to-severe stunting defined as ht/age  <2 SDs; hc70 has been multipled by 100
+    hc70 >= -200 & hc70 < 2000 ~ 0, # not moderate; excludes the 9997 and up that are out of range
+    hc70 >=2000 ~ 9, # set to 9 to include as separate category if desired
+    is.nan(hc70) ~ NA_real_, # set NaNs to missing
+    TRUE ~ NA_real_),
+  stunt = case_when(
+    hc70 < -300 ~ 2, # severe stunting defined as ht/age  <3 SDs; hc70 has been multipled by 100
+    hc70 >= -300 & hc70 < -200 ~ 1, # mod: between -3 and -2 SDs
+    hc70 >= -200 & hc70 < 2000 ~ 0, # not moderate; excludes the 9997 and up that are out of range
+    hc70 >=2000 ~ 9, # set to 9 to include as separate category if desired
+    is.nan(hc70) ~ NA_real_, # set NaNs to missing
+    TRUE ~ NA_real_),
+  
+  sevwasting = case_when(
+    hc72 < -300 ~ 1, # severe wasting defined as wt-for-ht <3 SDs; hc72 has been multipled by 100
+    hc72 >= -300 & hc72 < 2000 ~ 0, # not severe; excludes the 9997 and up that are out of range
+    hc72 >=2000 ~ 9, # set to 9 to include as separate category if desired
+    is.nan(hc72) ~ NA_real_, # set NaNs to missing
+    TRUE ~ NA_real_),
+  modwasting = case_when(
+    hc72 < -200 ~ 1, # mod wasting defined as wt-for-ht <2 SDs; hc72 has been multipled by 100
+    hc72 >= -200 & hc72 < 2000 ~ 0, # not severe; excludes the 9997 and up that are out of range
+    hc72 >=2000 ~ 9, # set to 9 to include as separate category if desired
+    is.nan(hc72) ~ NA_real_, # set NaNs to missing
+    TRUE ~ NA_real_),  
+  wasting = case_when(
+    hc72 < -300 ~ 2, # severe wasting defined as wt-for-ht <3 SDs; hc72 has been multipled by 100
+    hc72 >= -300 & hc72 < -200 ~ 1, # mod wasting; 
+    hc72 >= -200 & hc72 < 2000 ~ 0, # not severe; excludes the 9997 and up that are out of range
+    hc72 >=2000 ~ 9, # set to 9 to include as separate category if desired
+    is.nan(hc72) ~ NA_real_, # set NaNs to missing
+    TRUE ~ NA_real_),  
+  
+  underweight = case_when(
+    hc71 < -300 ~ 2, # severely underweight
+    hc71 >= -300 & hc71 < -200 ~ 1, # moderately underweight
+    hc71 >= -200 & hc71 < 200 ~ 0, # not over/underweight
+    hc71 >= 200 & hc71 < 2000 ~ 3, # overweight
+    hc71 >=2000 ~ 9, # set to 9 to include as separate category if desired
+    is.nan(hc71) ~ NA_real_, # set NaNs to missing
+    TRUE ~ NA_real_))
+
+table(kid_dhs_int$sevstunt, useNA = "always")
+table(kid_dhs_int$modstunt, useNA = "always")
+table(kid_dhs_int$stunt, useNA = "always")
+table(kid_dhs_int$sevwasting, useNA = "always")
+table(kid_dhs_int$modwasting, useNA = "always")
+table(kid_dhs_int$wasting, useNA = "always")
+table(kid_dhs_int$underweight, useNA = "always")
+
+kid_dhs_int$sevstunt <- as.factor(kid_dhs_int$sevstunt)
+kid_dhs_int$modstunt <- as.factor(kid_dhs_int$modstunt)
+kid_dhs_int$stunt <- as.factor(kid_dhs_int$stunt)
+kid_dhs_int$sevwasting <- as.factor(kid_dhs_int$sevwasting)
+kid_dhs_int$modwasting <- as.factor(kid_dhs_int$modwasting)
+kid_dhs_int$wasting <- as.factor(kid_dhs_int$wasting)
+kid_dhs_int$underweight <- as.factor(kid_dhs_int$underweight)
+
+# hc71 Weight/Age standard deviation (new WHO)
+class(kid_dhs_int$hc71)
+kid_dhs_int$hc71 <- as.numeric(kid_dhs_int$hc71)
+hist(kid_dhs_int$hc71)
+kid_dhs_int %>% filter(hc71 <2000) %>% 
+  ggplot()+
+  geom_histogram(aes(x=hc71))+ #, fill=shnprovin
+  facet_wrap(~shnprovin)
+
+# hc72 Weight/Height standard deviation (new WHO)
+kid_dhs_int$hc72 <- as.numeric(kid_dhs_int$hc72)
+kid_dhs_int %>% filter(hc72 <2000) %>% 
+  ggplot()+
+  geom_histogram(aes(x=hc72))+#, fill=shnprovin
+  geom_vline(xintercept=-200) # stunting line
+
+facet_wrap(~shnprovin)
+
+# adults
+
 
 
