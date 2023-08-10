@@ -267,6 +267,15 @@ kid_dhs_int <- kid_dhs_int %>% mutate(
 table(kid_dhs_int$shtetaindasyes, useNA = "always")
 table(kid_dhs_int$shtetaindasno, useNA = "always")
 
+# nutritional status: sevstunt, modstunt, stunt,sevwasting, modwasting, wasting, underweight
+survtable_all("hc57") # anemia
+survtable("hc57")
+survtable_all("stunt") 
+survtable("stunt")
+survtable_all("wasting") 
+survtable("wasting")
+survtable_all("underweight") 
+survtable("underweight")
 # age by province by hbv
 
 #ADULTS ------------------------------
@@ -813,7 +822,6 @@ table(kidmapsf$agenum, kidmapsf$hbvresultlowna, useNA = "always")
 
 
 # Choropleth ------------------
-
 drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%   st_transform(4326)
 
 wtdctskids <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx",
@@ -821,6 +829,7 @@ wtdctskids <- read_excel("/Users/camillem/OneDrive - University of North Carolin
 
 wtdctskids$ADM1_NAME <- toupper(wtdctskids$provnamesimp)
 drcprov_hbvkids <- left_join(drcprov,wtdctskids, by="ADM1_NAME")
+view(drcprov_hbvkids)
 
 ggplot()+
   geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
@@ -829,6 +838,62 @@ ggplot()+
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   ggtitle("Weighted HBV prevalence in kids ≤5")+
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.ticks=element_blank(), 
+        axis.text.x=element_blank(), 
+        axis.text.y=element_blank(),
+        panel.background = element_rect(fill="#daeff8", color=NA))
+
+# adults choropleth
+casehh <- adults2023int_hiv %>% filter(case5final == 1)
+controlhh <- adults2023int_hiv %>% filter(case5final == 0)
+
+designf_adcase <-svydesign(ids=casehh$hv001, strata=casehh$hv022 , weights=casehh$hh_weight,  data=casehh)
+options(survey.lonely.psu="adjust")
+designf_dhs2_adcase <-as_survey_design(designf_adcase)
+
+svytotal(~shnprovin, designf_dhs2_adcase, na.rm=T, survey.lonely.psu="adjust") 
+svytable(~ shnprovin + hbvresult, designf_dhs2_adcase) %>% clipr::write_clip()
+
+# controls
+designf_adcont <-svydesign(ids=controlhh$hv001, strata=controlhh$hv022 , weights=controlhh$hh_weight,  data=controlhh)
+options(survey.lonely.psu="adjust")
+designf_dhs2_adcont <-as_survey_design(designf_adcont)
+
+svytotal(~shnprovin, designf_dhs2_adcont, na.rm=T, survey.lonely.psu="adjust") 
+svytable(~ shnprovin + hbvresult, designf_dhs2_adcont) %>% clipr::write_clip()
+
+# import formatted results
+wtdprovad <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx",
+                         sheet = "adultschoro")
+
+wtdprovad$ADM1_NAME <- toupper(wtdprovad$provnamesimp)
+drcprov_hbvad <- left_join(drcprov,wtdprovad, by="ADM1_NAME")
+view(drcprov_hbvad)
+
+ggplot()+
+  geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
+  geom_sf(data=drcprov_hbvad,  mapping=aes(fill=caseprev))+
+  scale_fill_distiller(palette = 'Spectral',breaks=seq(0,75,20)) +
+  scale_x_continuous(limits=c(12,31)) + 
+  scale_y_continuous(limits=c(-13.5,5.4)) + 
+  ggtitle("Weighted HBsAg prevalence among exposed adults")+
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.ticks=element_blank(), 
+        axis.text.x=element_blank(), 
+        axis.text.y=element_blank(),
+        panel.background = element_rect(fill="#daeff8", color=NA))
+
+ggplot()+
+  geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
+  geom_sf(data=drcprov_hbvad,  mapping=aes(fill=controlprev))+
+  scale_fill_distiller(palette = 'Spectral', limits = c(0,75))+
+  #scale_fill_gradientn(colours = "viridis", limits = c(0,75))+
+  scale_x_continuous(limits=c(12,31)) + 
+  scale_y_continuous(limits=c(-13.5,5.4)) + 
+  ggtitle("Weighted HBsAg prevalence among unexposed adults")+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
         axis.ticks=element_blank(), 
@@ -1044,7 +1109,4 @@ hhwcases_kids <- hhwcases_kids %>%
 
 hhwcases_kids <- hhwcases_kids %>% arrange(prov2015,desc(totalkidpos))
 hhtrees <- hhwcases_kids %>% reframe(cluster_hh,totalkidpos, hv105, sex,reltoheadhh,prov2015,hbvresult) 
-
-
-
 
