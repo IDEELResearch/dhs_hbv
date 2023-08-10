@@ -91,8 +91,42 @@ summary(kid_adj)
 confint(kid_adj)
 
 
-# adults
+# adults-------------
 survtable_all_ad("hiv03") # hiv
 catvars <- c("catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
+
+adults2023int_hiv_nodrop <- adults2023int_hiv %>% filter(case5final != 9)
+adults2023int_hiv_nodrop$hv105 <- as.numeric(adults2023int_hiv_nodrop$hv105)
+# make survey design object
+designf_ad <-svydesign(ids=adults2023int_hiv_nodrop$hv001, strata=adults2023int_hiv_nodrop$hv022 , weights=adults2023int_hiv_nodrop$hh_weight,  data=adults2023int_hiv_nodrop)
+options(survey.lonely.psu="adjust")
+designf_dhs2_ad <-as_survey_design(designf_ad)
+
+table(adults2023int_hiv_nodrop$hv104)
+
+# hbsag result
+ad_hbs <- svyglm(hbvresult ~ case5final, designf_dhs2_ad, family=quasibinomial("log"))
+ad_hbs <- svyglm(hbvresult ~ case5final, designf_dhs2_ad, family=quasibinomial("identity"))
+summary(ad_hbs)
+confint(ad_hbs)
+
+# age
+ad_age <- svyglm(case5final ~ hv105, designf_dhs2_ad, family=quasibinomial("log"))
+ad_age <- svyglm(case5final ~ hv105, designf_dhs2_ad, family=quasibinomial("identity"))
+summary(ad_age)
+confint(ad_age)
+
+# sex
+ad_mf <- svyglm(case5final ~ hv104, designf_dhs2_ad, family=quasibinomial("log"))
+ad_mf <- svyglm(case5final ~ as.factor(hv104), designf_dhs2_ad, family=quasibinomial("identity"))
+summary(ad_mf)
+confint(ad_mf)
+
+# urban rural
+ad_urb <- svyglm(hbvresult ~ as.factor(hv025), designf_dhs2_ad, family=quasibinomial("log"))
+ad_urb <- svyglm(hbvresult ~ as.factor(hv025), designf_dhs2_ad, family=quasibinomial("identity"))
+summary(ad_urb)
+confint(ad_urb)
+
 
 
