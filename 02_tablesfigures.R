@@ -1009,6 +1009,25 @@ B <-
         panel.background = element_rect(fill="#daeff8", color=NA))
 ggsave("./Plots/krighbvprev.png", width = 9, height = 6)
 
+# Figure for Table 2 regression estimates--------
+library(readxl)
+unadjkids <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/Tables july2023.xlsx",
+                         sheet = "tab2kidsimport")
+
+ggplot(unadjkids, aes(x=level, y=prevdiff100)) +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_pointrange(aes(x=level, y=prevdiff100, ymin=lowerciprevdiff100, ymax=upperciprevdiff100), shape=15, size=0.8, color="black", show.legend=F, fatten=0.2) + 
+  geom_point(shape=15, size=5, aes(color=variable), show.legend=F, alpha=0.9) +
+  scale_color_brewer(palette = "Dark2")+
+  coord_flip() + theme_bw() +
+  #scale_x_continuous(trans = "reverse") + 
+  labs(x="", y="Unadjusted prevalence difference per 100 kids") + 
+  theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
+        axis.ticks.y=element_blank(),
+        panel.grid.minor=element_blank()) 
+
+ggsave("./Plots/aasldpd.png", width = 9, height = 6)
+
 # Exploratory DA---------------------
 # kids: kid_dhs_int
 # adults: adults2023int
