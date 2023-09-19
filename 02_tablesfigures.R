@@ -266,7 +266,10 @@ kid_dhs_int <- kid_dhs_int %>% mutate(
 
 table(kid_dhs_int$shtetaindasyes, useNA = "always")
 table(kid_dhs_int$shtetaindasno, useNA = "always")
+table(kid_dhs_int$hbvresult, useNA = "always")
 
+survtable_all("shteta") 
+survtable("shteta")
 # nutritional status: sevstunt, modstunt, stunt,sevwasting, modwasting, wasting, underweight
 survtable_all("hc57") # anemia
 survtable("hc57")
@@ -278,9 +281,16 @@ survtable_all("underweight")
 survtable("underweight")
 # age by province by hbv
 
+table(kid_dhs_int$hbvresult)
+pos <- kid_dhs_int %>% filter(hbvresult==1)
+dfkid <- pos[!duplicated(pos$cluster_hh),]
+table(kid_dhs_int$cluster_hh)
+
 #ADULTS ------------------------------
 adults2023int <- k08_nomiss_cc %>% filter(agegrp =="adult") #don't use k08_nomiss - doesn't have updated case/control status based on s/co 5
-
+table(adults2023int$case5final)
+table(adults2023int$case)
+table(adults2023int$case_orig, useNA = "always")
 #clean vars for table 1
 #make age numeric
 class(adults2023int$hv105)
@@ -316,6 +326,8 @@ adults2023int_hiv %>% head(cluster_hh, cluster_hh_2)
 adults2023int_hiv$hh_weight <- as.numeric(adults2023int_hiv$hv005)/1000000
 adults2023int_hiv$hbvresult <- as.factor(adults2023int_hiv$hbvresult)
 adults2023int_hiv$hiv03 <- as.factor(adults2023int_hiv$hiv03)
+
+adults2023int_hiv$case5final <- as.numeric(adults2023int_hiv$case5final)
 
 library(survey)
 library(srvyr)
@@ -356,6 +368,9 @@ survmean_ad <- function(var){
 }
 
 # get results for vars of interest
+# overall
+survtable_ad("case5final")
+class(adults2023int_hiv$case5final)
 survtable_all_ad("catresult") # overall n
 
 # continuous data: hhmem_n (number of household members), agenum (age)

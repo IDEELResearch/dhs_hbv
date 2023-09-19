@@ -177,7 +177,7 @@ k08_nomiss <- merge(k08_nomiss, kidresults[,c("dbsbarcode","plateposition","roun
 k08_nomiss$catresult5 <- k08_nomiss$catresult # in prep for sensitivity analyses with different cutoffs, add 5 to indicate the cat result call is using S/Co of 5 for those not retested
 # merge sco onto main dataset
 k08_nomiss <- merge(k08_nomiss, kidresults[,c("dbsbarcode","plateposition","round1sco_1","round2sco","round1call","round2call")], all.x = T, by="dbsbarcode")
-
+table(k08_nomiss$catresult5)
 # need to add case/control status of kids
 k08_nomiss %>% group_by(case) %>%  count()
 
