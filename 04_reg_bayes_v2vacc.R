@@ -1,82 +1,6 @@
-# Apply INLA code to HBV
-
-# from Cedar
-#Read in data:
-gepr_full<-read_rds("DRC_Final_dataset_full_covariates.rds")
-
-# check cluster GPS
-drc_clust <- gepr_full %>% group_by(hv001) %>% select(hv001,longnum, latnum)
-drc_clust_distinct <- drc_clust %>% 
-  group_by(hv001) %>% 
-  summarize(hhper=n())
-# check how many don't have gps
-drc_clust %>% filter(longnum==0)
-view(drc_clust)
-class(drc_clust$hv001) 
-class(drc_clust_distinct$hv001) 
-
-df2 <- left_join(drc_clust_distinct,drc_clust, by="hv001")
-
-view(df2)
-
-# look at number of clusters with kids - kid_dhs_int is df
-kids_clust <- kid_dhs_int %>% group_by(hv001) %>% select(hv001,longnum, latnum)
-kids_clust_dis <- kids_clust %>% 
-  group_by(hv001) %>% 
-  summarize(hhper=n())
-# check how many don't have
- view(kids_clust_dis)
- kids_clust_dis$hv001 <- as.numeric(kids_clust_dis$hv001)
- kids_clust$hv001 <- as.numeric(kids_clust$hv001)
- 
-df <- left_join(kids_clust_dis,kids_clust, by="hv001")
-class(kids_clust_dis$hv001) 
-class(kids_clust$hv001) 
-
-df_ed <- df %>% filter(longnum != 0)
-
-# save version with one row per cluster
-dup <- kids_clust[!duplicated(kids_clust[1]),]
-dup2 <- drc_clust[!duplicated(drc_clust[1]),]
-view(dup)
-
-# check clusters in kids but not in cedar's - are they all the sites with 0,0 GPS?
-dup3 <- dup %>% filter(!(hv001 %in% dup2$hv001))
-view(dup3)
-# add cluster weight variable back - could we choose a random gps point in province?
-class(dup3$hv001) 
-class(kid_dhs_int$hv001)
-kid_dhs_int$hv001 <- as.numeric(kid_dhs_int$hv001)
-
-dup4 <- left_join(dup3,kid_dhs_int[,c("hv001","hh_weight")], by="hv001")
-view(dup4)
-# yes, all the clusters in kids but not in cedar's are the ones without GPS
-kiddatanogps <- kid_dhs_int %>% filter(hv001 %in% dup3$hv001)
-table(kiddatanogps$shnprovin)
-table(kiddatanogps$shnprovin, kiddatanogps$hbvresultlowna, useNA = "always")
-
-addmargins(table(kid_dhs_int$shnprovin,kid_dhs_int$hbvresult))
-
-
-
-#Subset cluster locations:
-locations<-gepr_full%>%
-  select(longnum, latnum)
-view(locations)
-#bounding box for DRC
-DRC <- sf::as_Spatial(osmdata::getbb("Democratic Republic of the Congo",
-                                     featuretype = "country",
-                                     format_out = 'sf_polygon'))
-
-# Hillary adapt Varun/Cedar code
-# Using code from models - associations between livestock and malaria, bayesian approach
+# Run models - associations between livestock and malaria, bayesian approach
 # https://becarioprecario.bitbucket.io/inla-gitbook/index.html
 source("./02_code/data_and_libraries.R")
-
-
-library(INLA)
-library(inlabru)
-library(INLAspacetime)
 
 # load data
 dhs_clean_spatial <- readRDS(paste0(path, "01_data/dhs_clean_spatial.rds"))
@@ -107,94 +31,83 @@ dat <- dhs_model |> ungroup() |>
 table(dat$RDT, useNA = "always"); table(dat$livestock, useNA = "always")
 table(dat$cluster)
 
-# perform model selection ------------------------------------------------------
-# from columbia course
-formula_iid <- deaths ~ 1 + f(SIGLA, model = "iid") # SIGLA is province # function for each province that is iid
-model <- inla(
-  formula_iid,
-  data = data,
-  E = expected, # expected is variable in dataframe
-  family = "poisson",
-  #verbose = TRUE, 
-  control.predictor = list(link = 1), # log-link
-  control.compute = list(config = TRUE) # so that we can simulate draws of posterior
-)
+dat <- kid_dhs_int_nomissgps
+provlab <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx",
+                      sheet = "Sheet4")
+view(provlab)
+provlab <- provlab %>% rename(shnprovin = province)
+provlab$shnprovin <- as.character(provlab$shnprovin)
 
-# without random effects 
-kid_inla_mf_2  <- INLA::inla(hbvresult ~  hv104, #+ hv025 + as.numeric(hv270) ##hv104=sex, hv024=prov, hv025=urban(1)/rural(2), hv270 wealth,hv228(kids<5 slept under net)
+# use some type of join to connect the numbers to prov names to the numbers in 'data' to then make sure they are same as drcprov
+dat <- left_join(dat, provlab[,c("shnprovin", "hyphen","nohyphen")], by = "shnprovin" )
+# province options: provgrp_kin (8 levels), nohyphen - no hyphens, labeled
+
+
+# perform model selection ------------------------------------------------------
+# without random effects
+IM0.1  <- INLA::inla(hbvresult ~ shtetaindasno + hv104 + hv270 + hv025 + shnprovin,
                      family = "binomial",
-                     data = kid_dhs_int,
+                     data = dat,
                      control.compute = list(dic = TRUE),
                      control.predictor=list(link=1)) # link=1 from columbia course
-summary(kid_inla_mf_2)
+
 
 # with random effects
-kid_inla_mf_rand  <- INLA::inla(hbvresult ~ hv104 + f(hv001, model = "iid"),
+IM0.2  <- inla(hbvresult ~ shtetaindasno + hv104 + hv270 + hv025 + shnprovin + f(hv001, model = "iid"), # not sure the spatial intercept term is actually working
                family = "binomial",
-               data = kid_dhs_int,
+               data = dat,
                control.compute = list(dic = TRUE),
                control.predictor=list(link=1)) # link=1 from columbia course
 
-summary(kid_inla_mf_rand)
-
-#also try BYM not iid model (requires making the adjacency matrix)
+summary(IM0.1)
+summary(IM0.2)
 
 plotdat <- bind_rows(
-  as_tibble(summary(kid_inla_mf_rand)[["fixed"]], rownames = "var") |> mutate(model = "kid_inla_mf_rand"),
-  as_tibble(summary(kid_inla_mf_2)[["fixed"]], rownames = "var") |> mutate(model = "kid_inla_mf_2")
+  as_tibble(summary(IM0.1)[["fixed"]], rownames = "var") |> mutate(model = "IM0.1"),
+  as_tibble(summary(IM0.2)[["fixed"]], rownames = "var") |> mutate(model = "IM0.2")
 )
-view(plotdat)
+
 ggplot(data = plotdat) +
   geom_vline(xintercept = 0, lty = 2) +
   geom_point(aes(y = var, x = mean, color = model), position = position_dodge(width = 0.5)) +
+
   geom_linerange(aes(y = var, x = mean, xmin = `0.025quant`, xmax = `0.975quant`,
                      color = model), position = position_dodge(width = 0.5)) +
   coord_cartesian(xlim = c(-5, 5)) +
   theme_bw()
 
-# compare DIC values from each model -lower is better
-summary(kid_inla_mf_2)$dic$dic
-summary(kid_inla_mf_rand)$dic$dic 
+summary(IM0.1)$dic$dic
+summary(IM0.2)$dic$dic # random effects for cluster = better
 
-# from this practice run comparing sex ~ HBV without and with a random effect, the posterior estimates are similar and the DIC better for the no random effects model
 
 # set up mesh ------------------------------------------------------------------
 # create matrix of survey coordinates
-coords <- as.matrix(kid_dhs_int[, c("longnum","latnum")]) # longitude, latitude
-coords <- na.omit(coords)
+coords <- as.matrix(dat[, c(28, 27)]) # longitude, latitude
+coords <- as.matrix(dat[, c("longnum","latnum")]) # longitude, latitude
 coords <- coords %>% as.data.frame() %>%  filter(longnum != 0)
-view(coords)
-coords <- as.matrix(coords)
-check <- kid_dhs_int[, c("longnum","latnum")]
 
 
 # create mesh with regular triangles
 m1 <- INLA::inla.mesh.2d(coords, max.edge = c(0.45, 1), cutoff = 0.2)
-# meaning of these parameters: max.edge is the distance between nodes and the edge of the mesh - not good if points are too close to the boundary
-# cutoff is the shortest allowed distance between points (points within the set distance will be considered a single vertex)
-# some authors say cutoff = max.edge/5 of the inner domain
-# from https://rpubs.com/jafet089/886687
-# cutoff and max edge length of inner domain have biggest impact on parameter estimation and prediction per a simulation study, while max edge in outer domain not as much
-
 plot(m1, asp = 1, main = "")
 points(coords[, 1], coords[, 2], pch = 19, cex = 0.5, col = "red")
 
 # evaluate mesh formation, examine sd, values should be close to 1
 inla.mesh.assessment(m1, spatial.range = 3, alpha = 2)
 
-# create mesh with non-convex hull - this is important to avoid prediction outside boundaries (eg ocean)
-prdomain <- INLA::inla.nonconvex.hull(coords, -0.03, -0.05, resolution = c(100, 100)) #this is not working
-
-# try using DRC border as boundary
+# create mesh with non-convex hull - avoid prediction outside bounds
+#***these didn't work for me, using the DRC shapefile for bounds
+prdomain <- INLA::inla.nonconvex.hull(coords, -0.03, -0.05, resolution = c(100, 100))
+m2 <- INLA::inla.mesh.2d(boundary = prdomain, max.edge = c(0.45, 1), cutoff = 0.2)
+# ********
 
 DRC <- sf::as_Spatial(osmdata::getbb("Democratic Republic of the Congo",
                                      featuretype = "country",
                                      format_out = 'sf_polygon'))
-# drc.bound <- as(DRC, "Spatial") %>% inla.sp2segment()
 drc.bound <- inla.sp2segment(DRC)
-
-
 m2 <- INLA::inla.mesh.2d(boundary = drc.bound, max.edge = c(0.45, 1), cutoff = 0.2)
+
+
 plot(m2, asp = 1, main = "")
 points(coords[, 1], coords[, 2], pch = 19, cex = 0.5, col = "red")
 
@@ -202,30 +115,29 @@ inla.mesh.assessment(m2, spatial.range = 3, alpha = 2)
 
 
 # make the A matrix - translates spatial locations on the mesh into vectors in the model. SPDE and weights for spatial random intercept.
+loc = cbind(locations_km$x,locations_km$y)
+
 Mesh <- m2
-A <- INLA::inla.spde.make.A(Mesh, loc = coords) # Making A matrix
+A <- INLA::inla.spde.make.A(mesh=Mesh, loc = coords) # Making A matrix
 spde <-  INLA::inla.spde2.pcmatern(mesh = Mesh, prior.range = c(10, 0.5),
                                    prior.sigma = c(.5, .5)) # Making SPDE
 w <- INLA::inla.spde.make.index('w', n.spde = spde$n.spde) # making the w
 
 
 # combine the A matrix with the model matrix and random effects = stack
-kid_dhs_int_nomissgps <- kid_dhs_int %>% filter(longnum != 0)
-nrow(kid_dhs_int_nomissgps)
-
-
 # make the model matrix using the model formula without a response variable
-X0 <- model.matrix(as.formula("~ -1"), data = kid_dhs_int_nomissgps)
+X0 <- model.matrix(as.formula("~ -1 + livestock + gender + residence + wealth + slept_ITN"), data = dat)
+X0 <- model.matrix(as.formula("~ -1 + shtetaindasno + hv104 + hv270 + hv025 + nohyphen"), data = dat)
 
 X <- as.data.frame(X0[,]) # convert to a data frame. Eliminate the base level of the first categorical variable if applicable (you will manually specify an intercept below)
 
 head(X)
 
 # make the stack
-N <- nrow(kid_dhs_int_nomissgps)
+N <- nrow(dat)
 
 Stack <- INLA::inla.stack(
-  data = list(y = kid_dhs_int_nomissgps[, "hbvresult"]), # specify the response variable
+  data = list(y = dat[, "hbvresult"]), # specify the response variable
   tag = "est",
 
   A = list(1, 1, 1, A), # vector of multiplication factors for random and fixed effects
@@ -233,46 +145,23 @@ Stack <- INLA::inla.stack(
   effects = list(
     Intercept = rep(1, N), # specify the manual intercept!
     X = X, # attach the model matrix
-    cluster = kid_dhs_int_nomissgps$cluster_hh, # insert vectors of any random effects
+    cluster = dat$hv001, # insert vectors of any random effects
     w = w)) # attach the weights for random effects
 
 
 # run INLA models --------------------------------------------------------------
-# inla() from above
-kid_inla_mf_rand  <- INLA::inla(hbvresult ~ 1 + f(hv001, model = "iid"),
-                                family = "binomial",
-                                data = kid_dhs_int,
-                                control.compute = list(dic = TRUE),
-                                control.predictor=list(link=1)) # link=1 from columbia course
+f1 <- as.formula(paste0("hbvresult ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + ")))
+# fixed effects + random intercept
+f2 <- as.formula(paste0("hbvresult ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(cluster, model = 'iid')"))
+# fixed effects + random intercept + spatial intercept
+f3 <- as.formula(paste0("hbvresult ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(cluster, model = 'iid') + f(w, model = spde)"))
 
-summary(kid_inla_mf_rand)
 
 IM1 <- inla(f1, # Base model (no random effects)
             family = "binomial",
             data = inla.stack.data(Stack),
             control.compute = list(dic = TRUE),
             control.predictor = list(A = inla.stack.A(Stack))
-)
-
-# from Cedar
-r2.s <- inla(y ~ 0 + intercept + f(ID, model = "iid") + 
-               f(w, model=mat_spde), family = "binomial", 
-             data = inla.stack.data(stk.all), control.predictor = list(A = inla.stack.A(stk.all), compute = TRUE, link=1), 
-             quantiles = NULL, control.results = list(return.marginals.random = F,   return.marginals.predictor = F), verbose = TRUE)
-
-# from Hillary
-f1 <- as.formula(paste0("hbvresult ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + ")))
-# fixed effects + random intercept
-f2 <- as.formula(paste0("hbvresult ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(cluster_hh, model = 'iid')"))
-# fixed effects + random intercept + spatial intercept
-f3 <- as.formula(paste0("hbvresult ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(cluster_hh, model = 'iid') + f(w, model = spde)"))
-
-
-IM1 <- inla(f1, # Base model (no random effects)
-            family = "binomial",
-            data = inla.stack.data(Stack),
-            control.compute = list(dic = TRUE),
-            control.predictor = list(A = inla.stack.A(Stack)), verbose = T
 )
 
 IM2 <- inla(f2, # f1 + cluster random effects
