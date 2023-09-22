@@ -209,21 +209,21 @@ df_covar = data.frame(intercept=1,           #Need to specify manual intercept, 
                       logging=gepr_full$logging_10k,
                       mining=gepr_full$mining_10k)
 
-X0 <- model.matrix(as.formula("~ -1 + shtetaindasno + hv104 + hv270 + hv025 + nohyphen"), data = dat)
+X0 <- model.matrix(as.formula("~ -1 + shtetaindasno + hv104 + hv270 + hv025"), data = dat) # + nohyphen
 formula <- hbvresult ~ 0 + hv104 + hv270 + hv025 + shtetaindasno + nohyphen  + f(spatial, model=spde)
 
 
 #Construct stacks using 8 degree range for all spatial random effects
 stack_all <- inla.stack(
-  data = list(y = gepr_full$pfldh),tag='est', # specify the response variable
+  data = list(y = dat$hbvresult),tag='est', # specify the response variable
   
   A = list(1, 1, mat_a_id, mat_a_temp), # Vector of Multiplication factors for random and fixed effects (order listed needs to match the order of the effects below, use '1' for any non-spatial effects)              
   
   effects = list(
     
-    X = df_covar, # attach the covariate matrix
+    X = X0, # attach the covariate matrix
     
-    ID = gepr_full$hv001 # insert vectors of any non-spatial random effects
+    ID = dat$hv001 # insert vectors of any non-spatial random effects
     
    )) # w = mat_s_w,    #now the weights (inla.spde.make.index) for all the SPDE random effects variables
    #  temp_w = mat_s_temp)

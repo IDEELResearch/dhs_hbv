@@ -31,7 +31,9 @@ dat <- dhs_model |> ungroup() |>
 table(dat$RDT, useNA = "always"); table(dat$livestock, useNA = "always")
 table(dat$cluster)
 
-dat <- kid_dhs_int_nomissgps
+dat <- kid_dhs_int_nomissgps %>% select("dbsbarcode","hv001", "cluster_hh","longnum", "latnum", "shtetaindasno", "hv104", "agenum","hv270",  "hv025", "shnprovin", "provgrp_kin","hv105",  "hbvresult","totalkidpos_f","pfldh_kids")
+# kid_dhs_int_nomissgps has 6378 not 6996 (618 missing cluster gps - see another code file for analyzing this by province)
+
 provlab <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx",
                       sheet = "Sheet4")
 view(provlab)
@@ -45,7 +47,7 @@ dat <- left_join(dat, provlab[,c("shnprovin", "hyphen","nohyphen")], by = "shnpr
 
 # perform model selection ------------------------------------------------------
 # without random effects
-IM0.1  <- INLA::inla(hbvresult ~ shtetaindasno + hv104 + hv270 + hv025 + shnprovin,
+IM0.1  <- INLA::inla(hbvresult ~ shtetaindasno + hv104 + hv270 + hv025 , #+ shnprovin - keep it simple to start and leave out such a large var (only including age, wealth, rurality)
                      family = "binomial",
                      data = dat,
                      control.compute = list(dic = TRUE),
@@ -53,7 +55,7 @@ IM0.1  <- INLA::inla(hbvresult ~ shtetaindasno + hv104 + hv270 + hv025 + shnprov
 
 
 # with random effects
-IM0.2  <- inla(hbvresult ~ shtetaindasno + hv104 + hv270 + hv025 + shnprovin + f(hv001, model = "iid"), # not sure the spatial intercept term is actually working
+IM0.2  <- inla(hbvresult ~ shtetaindasno + hv104 + hv270 + hv025 + f(cluster_hh, model = "iid"), # not sure the spatial intercept term is actually working; # leaving out:  + shnprovin
                family = "binomial",
                data = dat,
                control.compute = list(dic = TRUE),
