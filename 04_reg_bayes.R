@@ -244,6 +244,7 @@ kid_inla_mf_rand  <- INLA::inla(hbvresult ~ 1 + f(hv001, model = "iid"),
                                 data = kid_dhs_int,
                                 control.compute = list(dic = TRUE),
                                 control.predictor=list(link=1)) # link=1 from columbia course
+#             control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE, return.marginals.predictor=TRUE)) # for getting the marginals
 
 summary(kid_inla_mf_rand)
 
@@ -372,5 +373,50 @@ inlaplot(m = IM3$summary.random$w$sd, colo="Blues", nam="Spatial intercept\nSD")
 # The reason to use INLA here instead of glm is because it makes model comparison easier (the bayesian framework takes into account uncertainty)
 # INLA allows us to adjust for spatial effects (which are omitted variables). It is possible there is a variable we don't know about or can't measure which has a spatial nature (e.g. temperature).
 # INLA maps allow us to adjust for variables vs. kriging which is a straw man model
+
+
+index <- inla.stack.index(stack = stk.full, tag = "pred")$data
+prev_mean <- res$summary.fitted.values[index, "mean"]
+prev_ll <- res$summary.fitted.values[index, "0.025quant"]
+prev_ul <- res$summary.fitted.values[index, "0.975quant"]
+
+pal <- colorNumeric("viridis", c(0, 1), na.color = "transparent")
+
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addCircles(
+    lng = coop[, 1], lat = coop[, 2],
+    color = pal(prev_mean)
+  ) %>%
+  addLegend("bottomright",
+            pal = pal, values = prev_mean,
+            title = "Prev."
+  ) %>%
+  addScaleBar(position = c("bottomleft"))
+
+# if you pull the marginals, you can try plotting exceedance probability 
+
+marg <- res$marginals.fitted.values[index][[1]]
+head(marg)
+1 - inla.pmarginal(q = 0.20, marginal = marg)
+# res$marginals.fitted.values
+excprob <- sapply(res$marginals.fitted.values[index],
+                  FUN = function(marg){1-inla.pmarginal(q = 0.20, marginal = marg)}) # can change q based on question of interest, policy, etc.
+
+# rasterize - when it works
+r_excprob <- rasterize(
+  x = coop, y = ra, field = excprob,
+  fun = mean
+)
+pal <- colorNumeric("viridis", c(0, 1), na.color = "transparent")
+
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addRasterImage(r_excprob, colors = pal, opacity = 0.5) %>%
+  addLegend("bottomright",
+            pal = pal,
+            values = values(r_excprob), title = "P(p>0.2)"
+  ) %>%
+  addScaleBar(position = c("bottomleft"))
 
 

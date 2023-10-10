@@ -184,7 +184,7 @@ mat_a_id<-inla.spde.make.A(mesh=meshc, loc = cbind(locations$longnum,locations$l
 mat_s_w <- inla.spde.make.index('w', n.spde = mat_spde$n.spde) # making the weights
 
 ##b) SPDE and weights for spatiallly varying slope terms
-mat_a_temp<-inla.spde.make.A(mesh=meshc, loc = cbind(locations$longnum,locations$latnum)) # cedar had , weights = gepr_full$temp_1mo_lag_s
+mat_a_temp<-inla.spde.make.A(mesh=meshc, loc = cbind(locations$longnum,locations$latnum, weights = gepr_full$temp_1mo_lag_s)) # cedar had 
 
 mat_s_temp<-inla.spde.make.index('temp_w', n.spde = mat_spde$n.spde) #The 'n.spde' stays the same for all spatial effects that use the same covariance structure
   #You can create different covariance structures for different spatial effects (i.e. if you want to change the range prior for a specific covariate)

@@ -10,69 +10,39 @@ library(RColorBrewer)
 
 # greg data
 Root <-"/Users/camillem/Documents/GitHub/dhs_hbv" # This should be the path to your working directory
-Hosts <- read.csv(paste0(Root, "/Data/HostCaptures.csv"), header = T)
-head(Hosts)
-substr(names(Hosts), 1, 1) <- toupper(substr(names(Hosts), 1, 1)) # Giving the host names capital letters
 
 # my data
-dat <- kid_dhs_int_nomissgps %>% select("dbsbarcode","hv001", "cluster_hh","longnum", "latnum", "shtetaindasno", "hv104", "agenum","hv270",  "hv025", "shnprovin", "provgrp_kin","hv105",  "hbvresult","totalkidpos_f","pfldh_kids")
+dat <- kid_dhs_int_nomissgps %>% dplyr::select("dbsbarcode","hv001", "cluster_hh","longnum", "latnum", "shtetaindasno", "hv104", "agenum","hv270",  "hv025", "shnprovin", "provgrp_kin","hv105",  "hbvresultlowna","totalkidpos_f","pfldh_kids")
 dat <- dat %>% mutate(sex = case_when(
                   hv104==1 ~ "Male",
-                  hv104==2 ~ "Female")
-                      )
+                  hv104==2 ~ "Female"))
+# make sure data are factors                      
 dat$age_f <- as.factor(dat$hv105)
 dat$tetanusab <- as.factor(dat$shtetaindasno)
 dat$wealth_f <- as.factor(dat$hv270)
+dat$rural_f <- as.factor(dat$hv025)
 
-phen <- c("Grid", "ID", "Easting", "Northing") # Base columns with spatial information we'll need
-phen <- c("nohyphen", "hv001", "longnum", "latnum") # Base columns with spatial information we'll need
+#phen <- c("Grid", "ID", "Easting", "Northing") # Base columns with spatial information we'll need
+phen <- c("shnprovin", "hv001", "longnum", "latnum") # Base columns with spatial information we'll need
 
-resp <- "Parasite.count" # Response variable
-resp <- "hbvresult" # Response variable
+#resp <- "Parasite.count" # Response variable
+resp <- "hbvresultlowna" # Response variable
 
-covar <- c("Month", # Julian month of sampling
-           "Sex", # Sex
-           "Smi", # Body condition
-           "Supp.corrected", # Nutrition supplementation
-           "Treated") # Treatment
 covar <- c("tetanusab", # tetatnus Ab detected 0/1 conservative in that no result is in not vacc
            "sex", # Sex
            "age_f", # age in years as factor
            "wealth_f", # wealth in 5 groups, as factor
-           "shnprovin",
-           "hv025") # province with numbering so that Kinshasa (=1) is referent
-table(dat$wealth_f, useNA = "always")
-class(dat$hv025)
+           "shnprovin", # province with numbering so that Kinshasa (=1) is referent
+           "rural_f") # rural/urban
 
 TestHBV <- na.omit(dat[, c(phen, resp, covar)]) # Getting rid of NA's, picking adults
 # We are using the [] to subset and only extract specific columns
-
-
-# Turning variables into factors
-TestHosts$Month <- as.factor(TestHosts$Month)
-TestHosts$Grid <- as.factor(TestHosts$Grid)
-TestHosts$Parasite.count <- round(TestHosts$Parasite.count) # Parasite counts should be integers
-
-table(table(TestHosts$ID)) # Enough repeat samples for a mixed model?
-
-# my data--already as factors above
 
 # set up custom theme
 THEME <- theme(axis.text.x = element_text(size = 12,colour = "black"),
 axis.text.y = element_text(size = 12, colour = "black"),
 axis.title.x = element_text(vjust = -0.35),
 axis.title.y = element_text(vjust = 1.2)) + theme_bw()
-
-(samp_locations <- ggplot(TestHosts, aes(Easting, Northing)) + 
-    geom_jitter(aes(colour = factor(Grid))) + coord_fixed() + 
-    THEME + 
-    labs(colour = "Grid"))
-# Recall that putting your entire ggplot code in brackets () creates the graph and then shows it in the plot viewer. If you don’t have the brackets, you’ve only created the object, but haven’t visualized it. 
-# You would then have to call the object such that it will be displayed by just typing samp_locations after you’ve created the “samp_locations” object.
-
-length(unique(TestHosts$ID))
-
-table(with(TestHosts, tapply(Grid, ID, function(x) length(unique(x)))))
 
 # Model fitting
 # First without random effects ####
@@ -83,17 +53,23 @@ f0.1 <- as.formula(paste0(resp, " ~ ", # Response first
 ))
 
 # Run the model
-IM0.1  <- inla(hbvresult ~ tetanusab + sex + age_f + wealth_f + shnprovin, # + hv025 
+IM0.1  <- inla(hbvresultlowna ~ tetanusab + sex + age_f + wealth_f + shnprovin + rural_f,
                family = "binomial", # Specify the family. Can be a wide range (see r-inla.org).
-               data = TestHBV) # Specify the data - the one without NAs
+               data = TestHBV,
+               control.compute = list(dic = TRUE)) # Specify the data - the one without NAs
+# Run the model without province
+IM0.1_noprv  <- inla(hbvresultlowna ~ tetanusab + sex + age_f + wealth_f + rural_f,
+               family = "binomial", # Specify the family. Can be a wide range (see r-inla.org).
+               data = TestHBV,
+               control.compute = list(dic = TRUE)) # Specify the data - the one without NAs
 
 # Run the model # (This is the same thing)
 IM0.1  <- inla(f0.1, 
                family = "binomial", # Specify the family. Can be a wide range (see r-inla.org).
-               data = TestHBV) # Specify the data
+               data = TestHBV,
+               control.compute = list(dic = TRUE)) # Specify the data
 
 # Then with an ID random effect ####
-
 f0.2 <- as.formula(paste0(resp, " ~ ", 
                           paste(covar, collapse = " + "), 
                           " +  f(hv001, model = 'iid')")) # This is how you include  a typical random effect.
@@ -103,10 +79,19 @@ f0.2 <- as.formula(paste0(resp, " ~ ",
 
 IM0.2  <- inla(f0.2, 
                family = "binomial",
-               data = TestHBV) 
+               data = TestHBV,
+               control.compute = list(dic = TRUE)) 
+IM0.2_noprv  <- inla(hbvresultlowna ~ tetanusab + sex + age_f + wealth_f + rural_f  +  f(hv001, model = 'iid'),
+                     family = "binomial", # Specify the family. Can be a wide range (see r-inla.org).
+                     data = TestHBV,
+                     control.compute = list(dic = TRUE)) # Specify the data - the one without NAs
 
 summary(IM0.1)
 summary(IM0.2)
+summary(IM0.1_noprv)
+summary(IM0.2_noprv)
+# DIC better in model with province, similar between random effects and fixed effects model
+
 # requires MCMCglmm and MASS : Efxplot(list(IM0.1, IM0.2))
 plotdat <- bind_rows(
   as_tibble(summary(IM0.1)[["fixed"]], rownames = "var") |> mutate(model = "IM0.1"),
@@ -118,7 +103,7 @@ ggplot(data = plotdat) +
   
   geom_linerange(aes(y = var, x = mean, xmin = `0.025quant`, xmax = `0.975quant`,
                      color = model), position = position_dodge(width = 0.5)) +
-  coord_cartesian(xlim = c(-5, 5)) +
+  #coord_cartesian(xlim = c(-5, 5)) +
   theme_bw()
 
 # greg albery wrote a function to perform model selection
@@ -129,10 +114,11 @@ Finalcovar  <- c("tetanusab", # tetanus
            "sex", # Sex
            "age_f",
            "wealth_f",
-           "hv025") # urbal/rural
+           "rural_f",
+           "shnprovin") # urbal/rural
+Finalcovar  <- c("sex")
+
 # let's try final cov without provin  shnprovin
-
-
 f1 <- as.formula(paste0(resp, " ~ ", 
                         paste(Finalcovar, collapse = " + "), 
                         "+ f(hv001, model = 'iid')")) 
@@ -144,15 +130,51 @@ IM1 <- inla(f1,
 
 summary(IM1)
 
-# now to the complex part where we add the mesh to account for spatial variation
-# greg:
-Locations = cbind(TestHosts$Easting, TestHosts$Northing) # using the sampling locations 
+# try one covariate at a time
+IM0.tet <- inla(hbvresultlowna ~ tetanusab + f(hv001, model = 'iid'),
+            family = "binomial",
+            data = TestHBV,
+            control.compute = list(dic = TRUE)) 
+IM0.tet$dic$dic
+summary(IM0.tet)
+#IM0.2_noprv  <- inla(hbvresultlowna ~ tetanusab + sex + age_f + wealth_f + rural_f  +  f(hv001, model = 'iid'),
+IM0.sex <- inla(hbvresultlowna ~ sex + f(hv001, model = 'iid'),
+                family = "binomial",
+                data = TestHBV,
+                control.compute = list(dic = TRUE)) 
+summary(IM0.sex)
+IM0.sex$dic$dic
+IM0.age <- inla(hbvresultlowna ~ age_f + f(hv001, model = 'iid'),
+                family = "binomial",
+                data = TestHBV,
+                control.compute = list(dic = TRUE)) 
+summary(IM0.age)
+IM0.age$dic$dic
+IM0.wea <- inla(hbvresultlowna ~ wealth_f + f(hv001, model = 'iid'),
+                family = "binomial",
+                data = TestHBV,
+                control.compute = list(dic = TRUE)) 
+summary(IM0.wea)
+IM0.wea$dic$dic
+IM0.rur <- inla(hbvresultlowna ~ rural_f + f(hv001, model = 'iid'),
+                family = "binomial",
+                data = TestHBV,
+                control.compute = list(dic = TRUE)) 
+summary(IM0.rur)
+IM0.rur$dic$dic
+IM0.prov <- inla(hbvresultlowna ~ shnprovin + f(hv001, model = 'iid'),
+                family = "binomial",
+                data = TestHBV,
+                control.compute = list(dic = TRUE)) 
+summary(IM0.prov)
+IM0.prov$dic$dic
+# province the strongest predictor (lowest DIC)
 
-#my data
+# Add spatial intercept-------------
+# now to the complex part where we add the mesh to account for spatial variation
 TestHBV$longnum <- as.numeric(TestHBV$longnum)
 TestHBV$latnum <- as.numeric(TestHBV$latnum)
 Locations = cbind(TestHBV$longnum, TestHBV$latnum) # using the sampling locations 
-
 
 
 MeshA <- inla.mesh.2d(jitter(Locations), max.edge = c(20, 40))
@@ -162,9 +184,7 @@ MeshC <- inla.mesh.2d(Locations, max.edge = c(10, 20))
 Mesh <- MeshB
 
 plot(MeshA)
-
 plot(MeshB)
-
 plot(MeshC)
 
 points(Locations, col = "red", pch = 2)
@@ -187,14 +207,24 @@ mat_spde = inla.spde2.pcmatern(mesh = meshc, prior.range = c(600, 0.5), prior.si
 mat_w_id <- inla.spde.make.index('w', n.spde = mat_spde$n.spde) # making the weights for spatial locations
 # ---
 
+# Making the A matrix 
 
+# HostsA <- inla.spde.make.A(Mesh, loc = Locations) # Making A matrix
+hbv_A <- inla.spde.make.A(Mesh, loc = Locations) # Making A matrix
+# Hosts.spde = inla.spde2.pcmatern(mesh = Mesh, prior.range = c(10, 0.5), prior.sigma = c(.5, .5)) # Making SPDE - greg used prior range of 10 to 0.5, changing to cedar's 600
+mat.hbv.spde = inla.spde2.pcmatern(mesh = Mesh, prior.range = c(600, 0.5), prior.sigma = c(.5, .5)) # Making SPDE
+mat.hbv.spde = inla.spde2.pcmatern(mesh = Mesh, prior.range = c(10, 0.5), prior.sigma = c(.5, .5)) # Making SPDE
+w.hbv <- inla.spde.make.index('w', n.spde = mat.hbv.spde$n.spde) # making the w
 
-# Making the A matrix - this is where i ran into trouble with hill/cedar's code
+# look into adding spatial slope - test by cov of interest
+##a) SPDE and weights for spatial random intercept
+mat_a_id<-inla.spde.make.A(mesh=meshc, loc = cbind(locations$longnum,locations$latnum))
+mat_s_w <- inla.spde.make.index('w', n.spde = mat_spde$n.spde) # making the weights
 
-HostsA <- inla.spde.make.A(Mesh, loc = Locations) # Making A matrix
-Hosts.spde = inla.spde2.pcmatern(mesh = Mesh, prior.range = c(10, 0.5), prior.sigma = c(.5, .5)) # Making SPDE - greg used prior range of 10 to 0.5, changing to cedar's 600
-Hosts.spde = inla.spde2.pcmatern(mesh = Mesh, prior.range = c(600, 0.5), prior.sigma = c(.5, .5)) # Making SPDE
-w.Host <- inla.spde.make.index('w', n.spde = Hosts.spde$n.spde) # making the w
+##b) SPDE and weights for spatiallly varying slope terms
+mat_a_temp<-inla.spde.make.A(mesh=meshc, loc = cbind(locations$longnum,locations$latnum)) # cedar had , weights = gepr_full$temp_1mo_lag_s
+mat_s_temp<-inla.spde.make.index('temp_w', n.spde = mat_spde$n.spde) #The 'n.spde' stays the same for all spatial effects that use the same covariance structure
+#You can create different covariance structures for different spatial effects (i.e. if you want to change the range prior for a specific covariate)
 
 
 # Making the model matrix #### 
@@ -203,7 +233,7 @@ X0 <- model.matrix(as.formula(paste0(" ~ -1 + ", paste(Finalcovar, collapse = " 
 
 X <- as.data.frame(X0[,-which(colnames(X0)%in%c("tetanusab0"))]) # convert to a data frame. Eliminate the base level of the first categorical variable if applicable (you will manually specify an intercept below) 
 
-head(X)
+head(X0)
 
 # Making the stack ####
 
@@ -211,23 +241,28 @@ N <- nrow(TestHBV)
 
 StackHost <- inla.stack(
   data = list(y = TestHBV[,resp]), # specify the response variable
-  
-  A = list(1, 1, 1, HostsA), # Vector of Multiplication factors for random and fixed effects              
-  
+  A = list(1, 1, 1, hbv_A), # Vector of Multiplication factors for random and fixed effects              
   effects = list(
-    
     Intercept = rep(1, N), # specify the manual intercept!
-    
     X = X, # attach the model matrix
-    
     ID = TestHBV$hv001, # insert vectors of any random effects
-    
-    w = w.Host)) # attach the w 
+    w = w.hbv)) # attach the w 
+
+StackHost_nofixcov <- inla.stack(
+  data = list(y = TestHBV[,resp]), # specify the response variable
+  A = list(1, 1, 1, hbv_A), # Vector of Multiplication factors for random and fixed effects              
+  effects = list(
+    Intercept = rep(1, N), # specify the manual intercept!
+#    X = X, # attach the model matrix
+    ID = TestHBV$hv001, # insert vectors of any random effects
+    w = w.hbv)) # attach the w 
 
 # now let's run
 f1 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + ")))
 f2 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid')"))
-f3 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid') + f(w, model = Hosts.spde)"))
+f3 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid') + f(w, model = mat.hbv.spde)"))
+#Spatially varying slope model (if including, need to remove covariate from fixed effects)
+f4 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid') + f(w, model = mat.hbv.spde) + f(temp_w, model=mat_spde)"))
 
 
 IM1 <- inla(f1, # Base model (no random effects)
@@ -248,8 +283,10 @@ IM3 <- inla(f3, # f2 + SPDE random effect
             family = "binomial",
             data = inla.stack.data(StackHost),
             control.compute = list(dic = TRUE),
-            control.predictor = list(A = inla.stack.A(StackHost))
-)
+            control.predictor = list(A = inla.stack.A(StackHost)),
+            control.inla=list(control.vb=list(emergency=31.00))
+            )
+
 summary(IM3)
 
 SpatialHostList <- list(IM1, IM2, IM3)
@@ -263,6 +300,7 @@ summary(IM1)$dic$dic
 summary(IM2)$dic$dic
 summary(IM3)$dic$dic
 
+library(fields)
 # cedar's plotting
 local.plot.field = function(field, meshc, xlim=c(12, 32), ylim=c(-14, 6), res=500, ...){
   stopifnot(length(field) == meshc$n)
@@ -278,7 +316,7 @@ local.plot.field = function(field, meshc, xlim=c(12, 32), ylim=c(-14, 6), res=50
 m = IM3 #Specify results to plot
 m$summary.fixed[]
 
-
+m$summary
 #spatial random intercept
 local.plot.field(m$summary.ran$w$mean, meshc ,axes=F)
 plot(DRC, add=T)
@@ -328,7 +366,7 @@ N <- nrow(TestHBV)
 StackHost <- inla.stack(
   data = list(y = TestHBV[,resp]), # specify the response variable
   
-  A = list(1, 1, 1, HostsA), # Vector of Multiplication factors for random and fixed effects              
+  A = list(1, 1, 1, hbv_A), # Vector of Multiplication factors for random and fixed effects              
   
   effects = list(
     
@@ -338,16 +376,16 @@ StackHost <- inla.stack(
     
     ID = TestHBV$hv001, # insert vectors of any random effects
     
-    w = w.Host)) # attach the w 
+    w = w.hbv)) # attach the w 
 
 inla.setOption(num.threads = 8) 
 # same functions as above - see example where greg adds random effect for group ()
 f1 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + ")))
 f2 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid')"))
-f3 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid') + f(w, model = Hosts.spde)"))
+f3 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid') + f(w, model = mat.hbv.spde)"))
 # from greg's example, the following f5 was the best fit - had random effect for the individual (given temporal data) and for group (month)
 f5 = as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), 
-                       "+ f(ID, model = 'iid') +  f(w, model = Hosts.spde, 
+                       "+ f(ID, model = 'iid') +  f(w, model = mat.hbv.spde, 
                        group = w.group, # This bit is new! 
                        control.group = list(model='exchangeable'))"))
 # see rest of his code for the mesh, stack, etc. for this extra random effect
@@ -412,7 +450,7 @@ Mesh <- MeshB
 
 # Making the A matrix - this is where i ran into trouble with hill/cedar's code
 
-HostsA <- inla.spde.make.A(Mesh, loc = Locations) # Making A matrix
+hbv_A <- inla.spde.make.A(Mesh, loc = Locations) # Making A matrix
 Hosts.spde = inla.spde2.pcmatern(mesh = Mesh, prior.range = c(10, 0.5), prior.sigma = c(.5, .5)) # Making SPDE - greg used prior range of 10 to 0.5, changing to cedar's 600
 # Hosts.spde = inla.spde2.pcmatern(mesh = Mesh, prior.range = c(600, 0.5), prior.sigma = c(.5, .5)) # Making SPDE
 w.Host <- inla.spde.make.index('w', n.spde = Hosts.spde$n.spde) # making the w
@@ -432,13 +470,13 @@ N <- nrow(dat_g)
 
 StackHost <- inla.stack(
   data = list(y = dat_g[,resp]), # specify the response variable
-  A = list(1, 1, 1, HostsA), # Vector of Multiplication factors for random and fixed effects              
+  A = list(1, 1, 1, hbv_A), # Vector of Multiplication factors for random and fixed effects              
   
   effects = list(
     Intercept = rep(1, N), # specify the manual intercept!
     X = X, # attach the model matrix
     ID = dat_g$hv001, # insert vectors of any random effects
-    w = w.Host) # attach the w 
+    w = w.hbv) # attach the w 
 )
 
 
@@ -447,7 +485,7 @@ StackHost <- inla.stack(
 # now let's run
 f1 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + ")))
 f2 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid')"))
-f3 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid') + f(w, model = Hosts.spde)"))
+f3 <- as.formula(paste0("y ~ -1 + Intercept + ", paste0(colnames(X), collapse = " + "), " +  f(ID, model = 'iid') + f(w, model = mat.hbv.spde)"))
 
 
 IM1 <- inla(f1, # Base model (no random effects)
