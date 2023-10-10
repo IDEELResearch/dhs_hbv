@@ -141,6 +141,24 @@ table(kid_dhs_int$catresult) # categorical with low/na as own column
 prop.table(svytable(~hbvresult, designf_dhs2))
 svyciprop(~hbvresult, designf_dhs2, method="lo")
 
+# antibodies: shroug, shorei, shrube
+svytotal(~shroug, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+svytotal(~shorei, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+svytotal(~shrube, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+
+svyby(~shroug,~shorei, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+svyby(~shroug,~shrube, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+table(Mumps=kid_dhs_int$shorei, Measles=kid_dhs_int$shroug)
+svyby(~shorei,~shrube, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
+table(Mumps=kid_dhs_int$shorei, Rubella=kid_dhs_int$shrube, useNA = "always")
+
+class(kid_dhs_int$shrube)
+class(kid_dhs_int$shroug)
+class(kid_dhs_int$shorei)
+table(kid_dhs_int$shorei)
+table(Mumps=kid_dhs_int$shorei, Rubella=kid_dhs_int$shrube, Measles=kid_dhs_int$shroug,useNA = "always")
+kid_dhs_int %>% count(shroug,shorei,shrube)
+
 
 # create functions to calculate weighted n
 # running functions pastes the results to clipboard which you can then copy into excel
@@ -514,7 +532,7 @@ output <- kidmapsf %>%
 # remove points where geometry is outside of DRC outline (geometry=c(0,0))
 output_points <- st_join(output, DRC, join = st_intersects) %>% filter(!is.na(Country))
 
-A <- 
+#A <- 
   ggplot() + 
   geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
   geom_sf(data=DRC, fill="cornsilk") +
