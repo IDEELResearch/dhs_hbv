@@ -2,11 +2,13 @@
 library(readxl)
 library(tidyverse)
 
-
 #read.dta() is in the package "foreign", so you will need
 library(foreign)
 drchiv <- read.dta("/Users/camillem/Documents/GitHub/dhs_hbv/Data/CDAR61DT/CDAR61FL.DTA", convert.factors = FALSE)
 # /Users/camillem/Documents/GitHub/dhs_hbv/Data/CDAR61DT
+# kids 
+d_k_or <- read.dta("/Users/camillem/Documents/GitHub/dhs_hbv/Data/CDKR61DT/CDKR61FL.DTA", convert.factors = FALSE)
+
 
 # load data
 dhsmeta <- readRDS("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/DHS_pr_full_merge_backup.rds")
@@ -281,8 +283,24 @@ nrow(k08_nomiss)
 table(k08_nomiss$agegrp, k08_nomiss$case)
 table(k08_nomiss_cc$agegrp, k08_nomiss_cc$case5final, useNA = "always")
 
+# Sensitivity analyses for cut-offs--------
+kid_dhs_int <- kid_dhs_int %>% 
+  mutate(catresult2 = case_when(
+    round1call == "NONREACTIVE" ~ "nonreactive", # nonreactive on round 1 = final result
+    round2call == "Reactive" ~ "reactive", #if retested in single tube and has pos round 2 result, this is final call
+    round2call == "Nonreactive" ~ "nonreactive", # since tube is gold standard, using this result (3 of 45 mismatch were >100)
+    # next: important decision: for those not retested, what cutoff used
+    round2call=="Not retested" & round1sco_1 >= 2 ~ "reactive", # not retested but first round >=2
+    round2call=="searching" & round1sco_1 >= 2 ~ "reactive", # can't find result but first round >5
+    round2call=="Not retested" & round1sco_1 < 2 ~ "nonreactive", # not retested but first round <5
+    round2call=="searching" & round1sco_1 < 2 ~ "nonreactive", # can't find result but first round <5
+    # low vol - set to missing
+    round1call == "low volume" ~ "low vol", # n=47
+    round1call == "missing" ~ NA_character_, # n=1
+    TRUE ~ NA_character_))
+kid_dhs_int %>% filter(round1call=="REACTIVE") %>% reframe(round1call, round2call)
 
-
+table(kid_dhs_int$round2call)
 
 # data exploration------------------------------------------------------------------------
 # using dataset with no missing (ie no low volume)
