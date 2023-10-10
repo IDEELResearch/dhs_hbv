@@ -128,5 +128,8 @@ ad_urb <- svyglm(hbvresult ~ as.factor(hv025), designf_dhs2_ad, family=quasibino
 summary(ad_urb)
 confint(ad_urb)
 
+# measles and malaria
+dhsmeta %>% filter(!is.na(pfldh_kids)) %>% summarise(shroug,pfldh_kids )
+table(dhsmeta$shroug, dhsmeta$hml35)
 
 
