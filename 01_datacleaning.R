@@ -17,8 +17,10 @@ adultresults <- read_excel("results.xlsx", sheet = "Results") # reimport
 
 kidresults <- read_excel("~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Epic Tracking 2022_jan2023.xlsx", 
                          sheet = "allclean")
+nrow(kidresults)
 # abbott results from previous testing
 abbott <- readRDS("abbott.rds")
+
 # from : abbott <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Abbott_HBVresults_rnd2.xls")
 
 # hh member tested by abbott yes/no (no results)
@@ -98,7 +100,6 @@ table(kidresults$catresult, kidresults$round2call,useNA = "always")
 adults_trim <- adultresults[,c("dbsbarcode", "catresult", "agegrp")]
 kids_trim <- kidresults[,c("dbsbarcode", "catresult", "agegrp")]
 
-
 # merge hbv results back onto metadata----------------------------------------------------------------
 # hh identifier
 dhsmeta$cluster_hh <- paste(dhsmeta$hv001, dhsmeta$hv002,sep = "_")
@@ -153,27 +154,35 @@ nrow(abbott_trim)
 # merge abbott results only k08 testing results - only abbott results for kids or hh members selected
 allhbvtesting <- rbind(k08testing, abbott_trim)
 table(allhbvtesting$k08orabb, useNA = "always")
+nrow(abbott_trim)
+addmargins(table(allhbvtesting$agegrp, useNA = "always"))
 
-table(allhbvtesting$agegrp, useNA = "always")
 
 allhbvtest <- allhbvtesting %>% 
   distinct_at(vars(dbsbarcode), .keep_all = TRUE) # remove duplicates
+addmargins(table(allhbvtest$agegrp, useNA = "always"))
+
 # check merge
-allhbvtesting %>% group_by(agegrp) %>% count()
-allhbvtesting %>% group_by(agegrp,catresult ) %>% count()
+allhbvtest %>% group_by(agegrp) %>% count()
+allhbvtest %>% group_by(agegrp,catresult ) %>% count()
+
+test <- allhbvtesting %>% filter(dbsbarcode %in% check2$dbsbarcode)
 
 # need to identify household members by case/control status
 # abbyesno has indicator for this 
-allhbvtesting <- merge(allhbvtesting, abbyesno[,c("dbsbarcode", "case")] , all.x = T, by="dbsbarcode")
+allhbvtest <- merge(allhbvtest, abbyesno[,c("dbsbarcode", "case")] , all.x = T, by="dbsbarcode")
 # case/control added for hh members but need to add for control kids
 
 # merge
-k08_all <- merge(dhsmeta, allhbvtesting, by = "dbsbarcode")
-k08_nomiss <- k08_all %>% filter(catresult=="reactive" |catresult=="nonreactive" )
+k08_all <- merge(dhsmeta, allhbvtest, by = "dbsbarcode")
+nrow(allhbvtest)-nrow(k08_all)
+k08_all %>% group_by(agegrp,catresult ) %>% count()
 
+k08_nomiss <- k08_all %>% filter(catresult=="reactive" |catresult=="nonreactive" )
+k08_nomiss %>% group_by(agegrp,catresult ) %>% count()
 # which not merging - all kids since adults were selected based on who merged and sample could be found
 nomerged <- allhbvtesting %>% filter(!(dbsbarcode %in% k08_all$dbsbarcode))
-
+nrow(nomerged)
 # merge original kid sco values on main dataset
 k08_nomiss <- merge(k08_nomiss, kidresults[,c("dbsbarcode","plateposition","round1sco_1","round2sco","round1call","round2call")], all.x = T, by="dbsbarcode")
 k08_nomiss$catresult5 <- k08_nomiss$catresult # in prep for sensitivity analyses with different cutoffs, add 5 to indicate the cat result call is using S/Co of 5 for those not retested
@@ -475,5 +484,59 @@ facet_wrap(~shnprovin)
 
 # adults
 
+#Vars from KR-----------------------------
+# see 05_famtreesdhs.R for merge of biospecimen results, PR, and KR (asked to caretakers about children, able to merge ~75%)
+
+# 1. DPT vaccination
+kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(
+  dpt1 = case_when(
+    h3 == 0 ~ 0, # did not receive DPT1 (reported as no and not on vac card)
+    h3 == 8 ~ 0, # assign don't know as didn't receive
+    h3 > 0 & h3 < 8 ~ 1, #h3==1 is vacc date on card, 2 is reported by mother, 3 is vacc on card
+    is.na(h3) ~ NA_real_), # these are the values to impute - need help on this
+  dpt2 = case_when(
+    h5 == 0 ~ 0, # did not receive DPT1 (reported as no and not on vac card)
+    h5 == 8 ~ 0, # assign don't know as didn't receive
+    h5 > 0 & h5 < 8 ~ 1, #h3==1 is vacc date on card, 2 is reported by mother, 3 is vacc on card
+    is.na(h5) ~ NA_real_), # these are the values to impute - need help on this
+  dpt3 = case_when(
+    h7 == 0 ~ 0, # did not receive DPT1 (reported as no and not on vac card)
+    h7 == 8 ~ 0, # assign don't know as didn't receive
+    h7 > 0 & h7 < 8 ~ 1, #h3==1 is vacc date on card, 2 is reported by mother, 3 is vacc on card
+    is.na(h7) ~ NA_real_) # these are the values to impute - need help on this
+)
+kid_hbv_kr_dis$dpt_count = kid_hbv_kr_dis$dpt1 + kid_hbv_kr_dis$dpt2 + kid_hbv_kr_dis$dpt3
+kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(dpt_doses = case_when(
+    dpt_count==3 ~ 2, # reported or noted as received for all
+    dpt_count==1 | dpt_count==2  ~ 1, # received 1 or 2 doses
+    dpt_count==0 ~ 0) # received none
+  )
+table(kid_hbv_kr_dis$dpt1, kid_hbv_kr_dis$dpt_doses, useNA = "always")
+
+# 2. injections: h15[x] vars - very few responses so skipping
+table(kid_hbv_kr_dis$v477, kid_hbv_kr_dis$v478, useNA = "always")
+table(kid_hbv_kr_dis$v477, kid_hbv_kr_dis$v480, useNA = "always")
+table(kid_hbv_kr_dis$v477,kid_hbv_kr_dis$hbvresultlowpos, useNA = "always")
+
+kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(injec = case_when(
+  v477==0 ~ 0, # no injections in last 12 mo
+  v477 > 0 & v477 <13 ~ 1, # 1-12 injections 
+  v477 >= 13  & v477 <25 ~ 2, # 13-24 injections 
+  v477 >= 25 ~ 3 # >=25 injections
+))
+table(kid_hbv_kr_dis$injec, useNA = "always")
+
+# 3. beating justified - any
+table(kid_hbv_kr_dis$v744b, useNA = "always") # count 'don't know's with yes
+
+kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(beat = case_when(
+  v744a > 0 | v744b > 0 | v744c > 0 | v744d > 0 | v744e > 0 ~ 1,
+  v744a == 0 | v744b ==  0 | v744c == 0 | v744d == 0 | v744e == 0 ~ 0
+))
+table(kid_hbv_kr_dis$beat, kid_hbv_kr_dis$v744a)
 
 
+clus_hh_ind,v001,v002,b16,midx,v006,v007,v008,v011,v012,v044, v136, v137, v138, v150, m15, m17, m18,
+bord, b0, b1, b2, b3, b8, b11, b12, b15, b16, seligdv, s1323, s1324, h3, h5, h7, h10, starts_with("h15"),
+v477, v478, v480, v501, v502, v503, v504, v505, v506, v507, v508, v525, v527, v528, v529, v530, v531, v532,
+v743f, starts_with("v744"),snprovin, v003, hw51, s1202, s1208, v034
