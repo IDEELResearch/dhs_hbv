@@ -367,6 +367,59 @@ adults2023int_hiv <- adults2023int_hiv %>%
 library(survey)
 library(srvyr)
 
+# create factor var for certain vars
+adults2023int_hiv <- adults2023int_hiv %>% 
+  dplyr::mutate(reltoheadhh=factor(
+    adults2023int_hiv$hv101, 
+    levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,98),
+    labels = c("Head", "Spouse","Son/daughter","Son/daughter-in-law","Grandchild","Parent","In-laws","Brother/sister","Co-spouse","Other","Adopted/in custody","Not related","Nephew/niece","Nephew/niece by marriage","Don't know")))
+table(adults2023int_hiv$reltoheadhh, useNA = 'always')
+table(kid_hbv_kr_dis$hv101)
+
+# simple reltoheadhh
+adults2023int_hiv <- adults2023int_hiv %>% mutate(reltoheadhh_simp = case_when(
+  reltoheadhh == "Head" ~ "Head",
+  reltoheadhh == "Spouse" ~ "Spouse",
+  reltoheadhh == "Son/daughter" ~ "Son/daughter",
+  reltoheadhh == "Son/daughter-in-law" | reltoheadhh == "In-laws" | reltoheadhh == "Nephew/niece by marriage" ~ "In-law fam",
+  reltoheadhh == "Brother/sister" | reltoheadhh == "Parent" ~ "Parent/sib",
+  reltoheadhh == "Other" | reltoheadhh == "Nephew/niece"  | reltoheadhh == "Adopted/in custody" | reltoheadhh == "Not related" | reltoheadhh == "Grandchild" ~ "Other"
+))
+
+adults2023int_hiv <- adults2023int_hiv %>% 
+  dplyr::mutate(prov2015=factor(
+    adults2023int_hiv$shnprovin, 
+    levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26),
+    labels = c("Kinshasa", "Kwango","Kwilu","Mai-Ndombe","Kongo Central","Equateur","Mongala","Nord-Ubangi","Sud-Ubangi","Tshuapa","Kasai","Kasai-Central","Kasai-Oriental","Lomami","Sankuru","Haut-Katanga","Haut-Lomami","Lualaba","Tanganyka","Maniema","Nord-Kivu","Bas-Uele","Haut-Uele","Ituri","Tshopo","Sud-Kivu")))
+
+adults2023int_hiv <- adults2023int_hiv %>% mutate(provgrp = case_when(
+  hv024 == "1" | hv024 == "2" | hv024 == "3" ~ 1,  #kinshasa, kongo central, bandundu (driving distance)
+  hv024 == "4" ~ 2,  # Equateur
+  hv024 == "5" | hv024 == "6" ~ 3,  # kasais
+  hv024 == "7" ~ 4,   # Katanga
+  hv024 == "8" ~ 5,# orientale
+  hv024 == "9" |  hv024 == "11"  ~ 6,# Kivus
+  hv024 == "10" ~ 7# maniema
+) %>% as.character(),
+provgrp_kin = case_when(
+  hv024 == "1"  ~ 1,  #kinshasa,  (capital)
+  hv024 == "2" | hv024 == "3" ~ 2,  # kongo central, bandundu (driving distance)
+  hv024 == "4" ~ 3,  # Equateur
+  hv024 == "5" | hv024 == "6" ~ 4,  # kasais
+  hv024 == "7" ~ 5,   # Katanga
+  hv024 == "8" ~ 6,# orientale
+  hv024 == "9" |  hv024 == "11"  ~ 7,# Kivus
+  hv024 == "10" ~ 8# maniema
+)%>% as.character())
+
+adults2023int_hiv <- adults2023int_hiv %>% 
+  dplyr::mutate(sex=factor(
+    adults2023int_hiv$hv104, 
+    levels = c(1, 2),
+    labels = c("Male", "Female")))
+
+adults2023int_hiv$hv105 <- as.numeric(adults2023int_hiv$hv105)
+
 # subset to those as case/controls and remove those being dropped bc of s/co5
 ad_5f <- adults2023int_hiv %>% filter(case5final < 3)
 nrow(adults2023int_hiv)
@@ -536,20 +589,25 @@ nrow(dhsmeta_kids)
 class(dhsmeta_kids$geometry) # saved as character not list
 head(dhsmeta_kids$geometry) # saved as character not list
 
+
+
 # redo sf geometry
-kidmapsf = st_as_sf(kid_dhs_int[!is.na(kid_dhs_int$latnum) &!is.na(kid_dhs_int$longnum),], coords = c("longnum", "latnum"), crs = 4326) 
+kidmapsf = st_as_sf(kid_hbv_kr_dis[!is.na(kid_hbv_kr_dis$latnum) &!is.na(kid_hbv_kr_dis$longnum),], coords = c("longnum", "latnum"), crs = 4326) 
 # evaluate the 6997-6973 that didn't map
 head(kidmapsf$geometry)
 nogpskid <- kid_dhs_int %>% filter(!(cluster_hh %in% kidmapsf$cluster_hh)) %>% select(c("cluster_hh","latnum", "longnum","shnprovin","adm1fips","adm1name","catresult" ))
 
+# from 06_mappingextra.R, use kidsmap_impsf, which has imputed GPS
+sf_use_s2(F)
+
 # subset cluster level df to get weights
-output_df <- kid_dhs_int %>% 
+output_df <- kid_hbv_kr_dis %>% 
   group_by(hv001) %>%
   dplyr::summarize(n=n(),
                   # npos = n(hbvresultlowna),
                    prev = mean(hbvresultlowna, na.rm=T)*100)
 
-output_df <- merge(output_df, kid_dhs_int[,c("hh_weight","hv001")],by="hv001", all.x = TRUE)
+output_df <- merge(output_df, kid_hbv_kr_dis[,c("hh_weight","hv001")],by="hv001", all.x = TRUE)
 
 # GADM boundaries from: https://gadm.org/download_country_v3.html
 admin0 <- readRDS('/Users/camillem/Documents/GitHub/animalaria/admin0.rds') %>%          # GADM admin0 boundaries
@@ -565,16 +623,14 @@ summary(kidmapsf$hh_weight)
 
 table(kidmapsf$shteta)
 
-output <- kidmapsf %>% 
+output <- kidsmap_impsf %>% 
   group_by(hv001) %>%
   dplyr::summarize(n=n(),
                    npos = sum(hbvresultlowna==1),
                    prev = mean(hbvresultlowna, na.rm=T)*100,
                    tetcovlower = mean(shtetaindasno, na.rm=T)*100,
                    tetcovupper = mean(shtetaindasyes, na.rm=T)*100)
-
-
-
+view(output)
 # remove points where geometry is outside of DRC outline (geometry=c(0,0))
 output_points <- st_join(output, DRC, join = st_intersects) %>% filter(!is.na(Country))
 
@@ -602,15 +658,13 @@ ggplot() +
 ggsave("./Plots/dhslocs.png", width = 9, height = 6)
 
 
-
-
-#A <- 
+A <- 
   ggplot() + 
   geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
   geom_sf(data=DRC, fill="cornsilk") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=output_points, aes(color=prev), alpha=0.8) + 
-  labs(color='HBV prevalence \nin children < 5') + 
+  labs(color='HBV prevalence (%) \nin children < 5') + 
   theme_bw(base_size=14) + 
   scale_color_distiller(palette = 'Spectral') + 
   scale_x_continuous(limits=c(12,31)) + 
@@ -622,7 +676,7 @@ ggsave("./Plots/dhslocs.png", width = 9, height = 6)
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA))
-
+A
 ggsave("./Plots/clusterhbvprev.png", width = 9, height = 6)
 
 C <- 
@@ -727,6 +781,7 @@ B <-
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA))
+B
 ggsave("./Plots/krighbvprev.png", width = 9, height = 6)
 
 
@@ -756,9 +811,9 @@ D <-
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA))
-
+D
 A + B + C + D + plot_layout(nrow=2, ncol = 2) + plot_annotation(tag_levels = 'A')
-ggsave('./Plots/draftmaps.png', width=15, height=9)
+ggsave('./Plots/2x2.png', width=15, height=9)
 
 ## adults map---------------------------------------------------------------
 # case/control hh of adults
@@ -837,6 +892,7 @@ drcprov <- left_join(drcprov, provlabels, by = "ADM1_VIZ_N")
 # add indicator for if prov had exp hh
 expprov <- hhsum_all %>% filter(casecontrol5==1) %>%  distinct(prov2015) %>% rename(prov_name = prov2015)
 expprov$hasexphh <- 1
+
 drcprov <- left_join(drcprov, expprov, by = "prov_name")
 drcprov$hasexphh <- ifelse(is.na(drcprov$hasexphh), 0, drcprov$hasexphh)
 # all provinces have unexposed households
@@ -1001,6 +1057,7 @@ ggplot()+
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA))
+ggsave("./Plots/kidprev.png", width = 9, height = 6)
 
 # adults choropleth
 casehh <- adults2023int_hiv %>% filter(case5final == 1)
