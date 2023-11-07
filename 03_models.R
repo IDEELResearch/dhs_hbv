@@ -7,6 +7,8 @@ options(scipen = 100, digits = 3)
 kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
 library(survey)
 library(srvyr)
+library(tidyverse)
+library(broom)
 
 kid_dhs_int <- kid_dhs_int %>% mutate(
   jaundice = case_when(
@@ -179,7 +181,6 @@ bivs_aspos <- function(var){ # glm function
   m <- svyglm(as.formula(paste0('hbvresultlowpos ~', var)), designf_dhs2, family=quasibinomial("identity"))
   cbind(tidy(m, exponentiate = FALSE), confint(m, method = c("Wald"))) %>% filter(stringr::str_detect(term, var))}
 
-library(broom)
 glmresults_low <- map_dfr(vars,bivs_asneg) 
 glmresults_low %>% print(noSpaces=T) 
 
@@ -321,20 +322,35 @@ catvars <- c("catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv2
 
 adults2023int_hiv_nodrop <- adults2023int_hiv %>% filter(case5final != 9)
 adults2023int_hiv_nodrop$hv105 <- as.numeric(adults2023int_hiv_nodrop$hv105)
+
 # make survey design object
-designf_ad <-svydesign(ids=adults2023int_hiv_nodrop$hv001, strata=adults2023int_hiv_nodrop$hv022 , weights=adults2023int_hiv_nodrop$hh_weight,  data=adults2023int_hiv_nodrop)
+# original ad_5f
+# exposed then unexposed: ad_5f_exp, ad_5f_unexp
 options(survey.lonely.psu="adjust")
-designf_dhs2_ad <-as_survey_design(designf_ad)
 
-table(adults2023int_hiv_nodrop$hv104)
+designf_ad <-svydesign(ids=ad_5f_exp$hv001, strata=ad_5f_exp$hv022 , weights=ad_5f_exp$hh_weight,  data=ad_5f_exp)
 
-# hbsag result
-ad_hbs <- svyglm(hbvresult ~ case5final, designf_dhs2_ad, family=quasibinomial("log"))
-ad_hbs <- svyglm(hbvresult ~ case5final, designf_dhs2_ad, family=quasibinomial("identity"))
+designf_ad_exp <-svydesign(ids=ad_5f_exp$hv001, strata=ad_5f_exp$hv022 , weights=ad_5f_exp$hh_weight,  data=ad_5f_exp)
+designf_dhs2_ad_exp <-as_survey_design(designf_ad_exp)
+
+designf_ad_un <-svydesign(ids=ad_5f_unexp$hv001, strata=ad_5f_unexp$hv022 , weights=ad_5f_unexp$hh_weight,  data=ad_5f_unexp)
+designf_dhs2_ad_un <-as_survey_design(designf_ad_un)
+
+table(ad_5f$case5final)
+
+# sex 1=male, 2=female clipr::write_clip()
+#ad_hbs <- svyglm(hbvresult ~ hv104, designf_dhs2_ad_exp, family=quasibinomial("log"))
+ad_hbs <- svyglm(hbvresult ~ hv104, designf_dhs2_ad_exp, family=quasibinomial("identity"))
 summary(ad_hbs)
 confint(ad_hbs)
 
-# age
+ad_hbs <- svyglm(hbvresult ~ hv104, designf_dhs2_ad_un, family=quasibinomial("log"))
+ad_hbs <- svyglm(hbvresult ~ hv104, designf_dhs2_ad_un, family=quasibinomial("identity"))
+summary(ad_hbs)
+confint(ad_hbs)
+
+
+# age - need to save as continuous
 ad_age <- svyglm(case5final ~ hv105, designf_dhs2_ad, family=quasibinomial("log"))
 ad_age <- svyglm(case5final ~ hv105, designf_dhs2_ad, family=quasibinomial("identity"))
 summary(ad_age)
@@ -352,8 +368,72 @@ ad_urb <- svyglm(hbvresult ~ as.factor(hv025), designf_dhs2_ad, family=quasibino
 summary(ad_urb)
 confint(ad_urb)
 
-# measles and malaria
-dhsmeta %>% filter(!is.na(pfldh_kids)) %>% summarise(shroug,pfldh_kids )
-table(dhsmeta$shroug, dhsmeta$hml35)
+#prov
+ad_urb <- svyglm(hbvresult ~ provgrp_kin, designf_ad_exp, family=quasibinomial("log"))
+ad_urb <- svyglm(hbvresult ~ provgrp_kin, designf_ad_exp, family=quasibinomial("identity"))
+summary(ad_urb)
+confint(ad_urb)
 
+
+# Next compare exposed and unexposed HBsAg+ adults, and exposed/unexposed HBsAg- adults
+vars_ad <- c("hv105", 'sex','hv025','hv270','pfldh_adult', "reltoheadhh_simp", "provgrp") #'hv026', 'hiv03',
+
+expad_bivs <- function(var){ # glm function
+  m <- svyglm(as.formula(paste0('hbvresult ~', var)), designf_ad_exp, family=quasibinomial("identity"))
+  cbind(tidy(m, exponentiate = FALSE), confint(m, method = c("Wald"))) %>% filter(stringr::str_detect(term, var))}
+
+unexpad_bivs <- function(var){ # glm function
+  m <- svyglm(as.formula(paste0('hbvresult ~', var)), designf_ad_un, family=quasibinomial("identity"))
+  cbind(tidy(m, exponentiate = FALSE), confint(m, method = c("Wald"))) %>% filter(stringr::str_detect(term, var))}
+
+ad_exp_glm <- map_dfr(vars_ad,expad_bivs) 
+ad_unexp_glm <- map_dfr(vars_ad,unexpad_bivs) 
+
+ad_exp_glm$exposure <- "Exposed"
+ad_unexp_glm$exposure <- "Unexposed"
+
+ad_glm <- rbind(ad_exp_glm, ad_unexp_glm)
+view(ad_glm)
+
+ad_glm$pd100 <- ad_glm$estimate*100
+ad_glm$pdcilow100 <- ad_glm$`2.5 %`*100
+ad_glm$pdciup100 <- ad_glm$`97.5 %`*100
+
+table(ad_glm$term)
+ad_glm$term[ad_glm$term == "hv0252"] <- "Rural vs urban"
+ad_glm$term[ad_glm$term == "hv105"] <- "1-year increase in age"
+ad_glm$term[ad_glm$term == "hv2702"] <- "Poorer vs poorest"
+ad_glm$term[ad_glm$term == "hv2703"] <- "Middle vs poorest"
+ad_glm$term[ad_glm$term == "hv2704"] <- "Richer vs poorest"
+ad_glm$term[ad_glm$term == "hv2705"] <- "Richest vs poorest"
+ad_glm$term[ad_glm$term == "pfldh_adult1"] <- "Pf+ vs Pf-"
+ad_glm$term[ad_glm$term == "provgrp2"] <- "Equateur vs Kongo central/Bandundu"
+ad_glm$term[ad_glm$term == "provgrp3"] <- "Kasais vs Kongo central/Bandundu"
+ad_glm$term[ad_glm$term == "provgrp4"] <- "Katanga vs Kongo central/Bandundu"
+ad_glm$term[ad_glm$term == "provgrp5"] <- "Orientale vs Kongo central/Bandundu"
+ad_glm$term[ad_glm$term == "provgrp6"] <- "Kivus vs Kongo central/Bandundu"
+ad_glm$term[ad_glm$term == "provgrp7"] <- "Maniema vs Kongo central/Bandundu"
+ad_glm$term[ad_glm$term == "reltoheadhh_simpIn-law fam"] <- "In-laws of head vs head"
+ad_glm$term[ad_glm$term == "reltoheadhh_simpOther"] <- "Other vs had of hh"
+ad_glm$term[ad_glm$term == "reltoheadhh_simpParent/sib"] <- "Parent/sibling of head vs head"
+ad_glm$term[ad_glm$term == "reltoheadhh_simpSon/daughter"] <- "Child of head vs head"
+ad_glm$term[ad_glm$term == "reltoheadhh_simpSpouse"] <- "Spouse of head vs head"
+ad_glm$term[ad_glm$term == "sexFemale"] <- "Female vs male"
+
+
+ggplot(ad_glm, aes(x=term, y=pd100)) +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_pointrange(aes(x=term, y=pd100, ymin=pdcilow100, ymax=pdciup100), shape=15, size=0.8, color="black", show.legend=T, fatten=0.2, position=position_dodge2(width = 1.0) ) + 
+  geom_point(shape=15, size=5, aes(color=exposure, group=exposure), position=position_dodge2(width = 1.0) , show.legend=T) + #alpha=0.9
+  scale_color_manual(values =  c("#c23728","#22a7f0"))+
+  #scale_color_brewer(palette = "Dark2")+
+  coord_flip() + theme_bw() +
+#  scale_alpha_discrete(range = c(0.35, 0.9))+
+  #scale_x_continuous(trans = "reverse") + 
+  labs(x="", y="Unadjusted prevalence difference per 100 adults") + 
+  theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
+        axis.ticks.y=element_blank(),
+        panel.grid.minor=element_blank())
+ + guides(color="none")
+ggsave("./Plots/adults_forest.png", width = 9, height = 5)
 
