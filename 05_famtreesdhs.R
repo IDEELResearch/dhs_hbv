@@ -369,7 +369,7 @@ head(df_sco5$latnum)
 uniq_prov <- df_sco5 %>% distinct(hv001, cluster_hh, prov2015,geometry,latnum, longnum, hv005, hv026) #hv005 is start of weight variable
 view(uniq_prov)
 # hv026 Place of residence, 0  Capital, large city, 1  Small city, 2  Town, 3  Countryside
-hhsum_all <- merge(hhsum_all, uniq_prov[, c("geometry","hv001","cluster_hh","hv005","latnum","longnum","hv026")], by = "cluster_hh", all.x=T)
+hhsum_all <- merge(hhsum_all, uniq_prov[, c("geometry","hv001","cluster_hh","hv005","latnum","longnum","hv026","prov2015")], by = "cluster_hh", all.x=T)
 colnames(hhsum_all)
 hhsum_all$hh_weight <- as.numeric(hhsum_all$hv005)/1000000
 #weighted prevalence
