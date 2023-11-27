@@ -12,21 +12,47 @@ library(RColorBrewer)
 Root <-"/Users/camillem/Documents/GitHub/dhs_hbv" # This should be the path to your working directory
 
 # my data
-dat <- kid_dhs_int_nomissgps %>% dplyr::select("dbsbarcode","hv001", "cluster_hh","longnum", "latnum", "shtetaindasno", "hv104", "agenum","hv270",  "hv025", "shnprovin", "provgrp_kin","hv105",  "hbvresultlowna","totalkidpos_f","pfldh_kids")
+# KR merge kid_hbv_kr
+## in prog: dat <- kid_hbv_kr_dis %>% dplyr::select("dbsbarcode","hv001", "cluster_hh","longnum", "latnum", "shtetaindasno", "hv104", "agenum","hv270",  "hv025", 
+   ##                                     "shnprovin", "provgrp_kin","hv105",  "hbvresultlowna","totalkidpos_f","pfldh_kids", "stunt", "wasting", "underweight", )
+table(kid_hbv_kr_dis$h3, useNA = "always")
+table(kid_hbv_kr_dis$h5, useNA = "always")
+table(kid_hbv_kr_dis$h7, kid_hbv_kr_dis$hbvresultlowna, useNA = "always")
+
+
+dat <- kid_dhs_int_nomissgps %>% dplyr::select("dbsbarcode","hv001", "cluster_hh","longnum", "latnum", "shtetaindasno", "hv104", 
+                                        "agenum","hv270",  "hv025", "hv026","shnprovin", "provgrp_kin","hv105",  "hbvresultlowna","totalkidpos_f","pfldh_kids")
+# with KR vars
+dat <- kid_hbv_kr_dis %>% dplyr::select("dbsbarcode","hv001", "cluster_hh","longnum", "latnum", "shtetaindasno", "hv104", 
+                                        "agenum","hv270",  "hv025", "hv026","shnprovin", "provgrp_kin","hv105",  "hbvresultlowna", "hbvresultlowpos","totalkidpos_f","pfldh_kids",
+                                        "dpt_count", "dpt_doses", "injec", "wast_mod", "stunt_mod", "beat")
+dat_all <- kid_hbv_kr_dis %>% dplyr::select("dbsbarcode","hv001", "cluster_hh","longnum", "latnum", "shtetaindasno", "hv104", 
+                                               "agenum","hv270",  "hv025", "hv026","shnprovin", "provgrp_kin","hv105",  "hbvresultlowna","hbvresultlowpos","totalkidpos_f","pfldh_kids")
+
 dat <- dat %>% mutate(sex = case_when(
                   hv104==1 ~ "Male",
                   hv104==2 ~ "Female"))
+dat_all <- dat_all %>% mutate(sex = case_when(
+  hv104==1 ~ "Male",
+  hv104==2 ~ "Female"))
+
 # make sure data are factors                      
 dat$age_f <- as.factor(dat$hv105)
 dat$tetanusab <- as.factor(dat$shtetaindasno)
 dat$wealth_f <- as.factor(dat$hv270)
 dat$rural_f <- as.factor(dat$hv025)
 
+dat_all$age_f <- as.factor(dat_all$hv105)
+dat_all$tetanusab <- as.factor(dat_all$shtetaindasno)
+dat_all$wealth_f <- as.factor(dat_all$hv270)
+dat_all$rural_f <- as.factor(dat_all$hv025)
+
 #phen <- c("Grid", "ID", "Easting", "Northing") # Base columns with spatial information we'll need
 phen <- c("shnprovin", "hv001", "longnum", "latnum") # Base columns with spatial information we'll need
 
 #resp <- "Parasite.count" # Response variable
-resp <- "hbvresultlowna" # Response variable
+resp <- "hbvresultlowna" # Response variable - when 46 low vol are neg
+resp <- "hbvresultlowpos" # Response variable - when 46 are positive
 
 covar <- c("tetanusab", # tetatnus Ab detected 0/1 conservative in that no result is in not vacc
            "sex", # Sex
@@ -36,7 +62,11 @@ covar <- c("tetanusab", # tetatnus Ab detected 0/1 conservative in that no resul
            "rural_f") # rural/urban
 
 TestHBV <- na.omit(dat[, c(phen, resp, covar)]) # Getting rid of NA's, picking adults
+TestHBV <- na.omit(dat) # Getting rid of NA's, picking adults
+TestHBV2 <- na.omit(dat_all) # Getting rid of NA's, picking adults
 # We are using the [] to subset and only extract specific columns
+nrow(dat) - nrow(TestHBV)
+nrow(dat_all) - nrow(TestHBV2)
 
 # set up custom theme
 THEME <- theme(axis.text.x = element_text(size = 12,colour = "black"),
@@ -130,45 +160,106 @@ IM1 <- inla(f1,
 
 summary(IM1)
 
-# try one covariate at a time
-IM0.tet <- inla(hbvresultlowna ~ tetanusab + f(hv001, model = 'iid'),
-            family = "binomial",
-            data = TestHBV,
-            control.compute = list(dic = TRUE)) 
+# try one covariate at a time---------------------------
+kid_hbv_kr_dis$tet
+table(TestHBV$hbvresultlowna, useNA = "always") # have dropped the low vol - should add back in
+view(TestHBV)
+nrow(TestHBV)
+
+# varun says identity link for prev diffs is in family=logistic and this is an inla misnomer https://inla.r-inla-download.org/r-inla.org/doc/likelihood/logistic.pdf
+IM0.tet <- inla(hbvresultlowna ~ 1 + shtetaindasyes + f(hv001, model = 'iid'),
+            family = "logistic",
+            Ntrials = nrow(kid_hbv_kr_dis), 
+            data = kid_hbv_kr_dis,
+            control.family = list(link="identity"),
+            control.compute = list(dic = TRUE) ,  control.predictor = list(compute=TRUE),
+            control.fixed = list(prec = 1e-09)) 
+# values still not what svyglm() gives
 IM0.tet$dic$dic
 summary(IM0.tet)
+IM0.tet$summary.fixed
+plot(IM0.tet)
+min(IM0.tet$marginals.fixed$tetanusab1)
+plot(IM0.tet$marginals.fixed$tetanusab0, type = "l", xlab = "beta",
+     ylab = "density", xlim = c(-15, -12 ))
+plot(IM0.tet$marginals.fixed$tetanusab1, type = "l", xlab = "beta",
+     ylab = "density", xlim = c(-15, -12 ))
+## need to figure out what the coeffs mean (-13.7 and -12.8 for tet+/tet-)
+
+# from Cameletti text p142-3 - exponentiate coefficients for easier interpretation, can exponentiate the beta1 marginals using inla.tmarginal() then inla.zmarginal()
+# or if solely interested in posterior mean, can using inla.emarginal()
+inla.emarginal(exp, IM0.tet$marginals.fixed$tetanusab1)
+
+
+
 #IM0.2_noprv  <- inla(hbvresultlowna ~ tetanusab + sex + age_f + wealth_f + rural_f  +  f(hv001, model = 'iid'),
 IM0.sex <- inla(hbvresultlowna ~ sex + f(hv001, model = 'iid'),
                 family = "binomial",
                 data = TestHBV,
                 control.compute = list(dic = TRUE)) 
+IM0.sex <- inla(hbvresultlowna ~ -1 + sex + f(hv001, model = 'iid'),
+                family = "binomial",
+                Ntrials = nrow(TestHBV), 
+                data = TestHBV,
+                control.compute = list(dic = TRUE) ,  control.predictor = list(compute=TRUE))
+                #control.fixed = list(prec = 1e-09)) 
 summary(IM0.sex)
 IM0.sex$dic$dic
+IM0.sex$summary.linear.predictor
+IM0.sex$summary.fitted.values
+
 IM0.age <- inla(hbvresultlowna ~ age_f + f(hv001, model = 'iid'),
                 family = "binomial",
                 data = TestHBV,
                 control.compute = list(dic = TRUE)) 
+IM0.age <- inla(hbvresultlowna ~  age_f + f(hv001, model = 'iid'),
+                family = "binomial",
+                Ntrials = nrow(TestHBV), 
+                data = TestHBV,
+                control.compute = list(dic = TRUE) ,  control.predictor = list(compute=TRUE))
 summary(IM0.age)
 IM0.age$dic$dic
+
 IM0.wea <- inla(hbvresultlowna ~ wealth_f + f(hv001, model = 'iid'),
                 family = "binomial",
                 data = TestHBV,
                 control.compute = list(dic = TRUE)) 
 summary(IM0.wea)
 IM0.wea$dic$dic
+IM0.wea <- inla(hbvresultlowna ~  wealth_f + f(hv001, model = 'iid'),
+                family = "binomial",
+                Ntrials = nrow(TestHBV), 
+                data = TestHBV,
+                control.compute = list(dic = TRUE) ,  control.predictor = list(compute=TRUE))
+
 IM0.rur <- inla(hbvresultlowna ~ rural_f + f(hv001, model = 'iid'),
                 family = "binomial",
                 data = TestHBV,
                 control.compute = list(dic = TRUE)) 
+IM0.rur <- inla(hbvresultlowna ~  rural_f + f(hv001, model = 'iid'),
+                family = "binomial",
+                Ntrials = nrow(TestHBV), 
+                data = TestHBV,
+                control.compute = list(dic = TRUE) ,  control.predictor = list(compute=TRUE))
 summary(IM0.rur)
 IM0.rur$dic$dic
+
 IM0.prov <- inla(hbvresultlowna ~ shnprovin + f(hv001, model = 'iid'),
                 family = "binomial",
                 data = TestHBV,
                 control.compute = list(dic = TRUE)) 
+IM0.prov <- inla(hbvresultlowna ~  shnprovin + f(hv001, model = 'iid'),
+                family = "binomial",
+                Ntrials = nrow(TestHBV), 
+                data = TestHBV,
+                control.compute = list(dic = TRUE) ,  control.predictor = list(compute=TRUE))
 summary(IM0.prov)
 IM0.prov$dic$dic
 # province the strongest predictor (lowest DIC)
+
+# add: pf malaria, 
+
+
 
 # Add spatial intercept-------------
 # now to the complex part where we add the mesh to account for spatial variation
