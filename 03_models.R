@@ -72,8 +72,6 @@ kid_hbv_kr_dis <- kid_hbv_kr_dis %>% # 1=male, 2=female but make 0=female, 1=mal
     hv104 == "1" ~ "1",
     hv104 == "2" ~ "0"
   ))
-
-
 # make survey design object
 designf <-svydesign(ids=kid_hbv_kr_dis$hv001, strata=kid_hbv_kr_dis$hv022 , weights=kid_hbv_kr_dis$hh_weight,  data=kid_hbv_kr_dis)
 options(survey.lonely.psu="adjust")
@@ -264,6 +262,8 @@ glmresults$term[glmresults$term == "stunt_mod9"] <- "Missing stunting vs none"
 glmresults$term[glmresults$term == "wast_mod1"] <- "Mod-to-severe wasting vs none"
 glmresults$term[glmresults$term == "wast_mod9"] <- "Missing wasting vs none"
 
+view(glmresults)
+write.csv(glmresults, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/glmresults.csv")
 
 ggplot(glmresults, aes(x=term, y=pd100)) +
   geom_hline(yintercept=0, linetype='dashed') +
@@ -420,11 +420,13 @@ ad_glm$term[ad_glm$term == "reltoheadhh_simpSon/daughter"] <- "Child of head vs 
 ad_glm$term[ad_glm$term == "reltoheadhh_simpSpouse"] <- "Spouse of head vs head"
 ad_glm$term[ad_glm$term == "sexFemale"] <- "Female vs male"
 
+write.csv(ad_glm, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/ad_glm.csv")
 
+library(patchwork)
 ggplot(ad_glm, aes(x=term, y=pd100)) +
   geom_hline(yintercept=0, linetype='dashed') +
-  geom_pointrange(aes(x=term, y=pd100, ymin=pdcilow100, ymax=pdciup100), shape=15, size=0.8, color="black", show.legend=T, fatten=0.2, position=position_dodge2(width = 1.0) ) + 
-  geom_point(shape=15, size=5, aes(color=exposure, group=exposure), position=position_dodge2(width = 1.0) , show.legend=T) + #alpha=0.9
+  geom_pointrange(aes(x=term, y=pd100, ymin=pdcilow100, ymax=pdciup100), shape=15, size=0.8, color="black", show.legend=T, fatten=0.2, position=position_dodge2(width = 0.5) ) + 
+  geom_point(shape=15, size=5, aes(color=exposure, group=exposure), position=position_dodge2(width = 0.5) , show.legend=T) + #alpha=0.9
   scale_color_manual(values =  c("#c23728","#22a7f0"))+
   #scale_color_brewer(palette = "Dark2")+
   coord_flip() + theme_bw() +
@@ -435,5 +437,5 @@ ggplot(ad_glm, aes(x=term, y=pd100)) +
         axis.ticks.y=element_blank(),
         panel.grid.minor=element_blank())
  + guides(color="none")
-ggsave("./Plots/adults_forest.png", width = 9, height = 5)
+ggsave("./Plots/adults_forest.png", width = 9, height = 9)
 
