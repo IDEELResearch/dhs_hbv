@@ -815,6 +815,15 @@ D
 A + B + C + D + plot_layout(nrow=2, ncol = 2) + plot_annotation(tag_levels = 'A')
 ggsave('./Plots/2x2.png', width=15, height=9)
 
+# where left off Nov 6----
+# make indicator var for imputed vs not
+# overlay cluster points with surfaces
+# test out different imputed locations to see how maps vary
+# consider centroid and way of sampling multiple
+
+
+
+
 ## adults map---------------------------------------------------------------
 # case/control hh of adults
 table(adults2023int$case5final, adults2023int$hbvresult, useNA = "always")
