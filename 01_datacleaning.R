@@ -535,8 +535,11 @@ kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(beat = case_when(
 ))
 table(kid_hbv_kr_dis$beat, kid_hbv_kr_dis$v744a)
 
+# variables from KR
+# clus_hh_ind,v001,v002,b16,midx,v006,v007,v008,v011,v012,v044, v136, v137, v138, v150, m15, m17, m18,
+# bord, b0, b1, b2, b3, b8, b11, b12, b15, b16, seligdv, s1323, s1324, h3, h5, h7, h10, starts_with("h15"),
+# v477, v478, v480, v501, v502, v503, v504, v505, v506, v507, v508, v525, v527, v528, v529, v530, v531, v532,
+# v743f, starts_with("v744"),snprovin, v003, hw51, s1202, s1208, v034
 
-clus_hh_ind,v001,v002,b16,midx,v006,v007,v008,v011,v012,v044, v136, v137, v138, v150, m15, m17, m18,
-bord, b0, b1, b2, b3, b8, b11, b12, b15, b16, seligdv, s1323, s1324, h3, h5, h7, h10, starts_with("h15"),
-v477, v478, v480, v501, v502, v503, v504, v505, v506, v507, v508, v525, v527, v528, v529, v530, v531, v532,
-v743f, starts_with("v744"),snprovin, v003, hw51, s1202, s1208, v034
+
+
