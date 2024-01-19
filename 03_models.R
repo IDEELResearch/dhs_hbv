@@ -72,6 +72,7 @@ kid_hbv_kr_dis <- kid_hbv_kr_dis %>% # 1=male, 2=female but make 0=female, 1=mal
     hv104 == "1" ~ "1",
     hv104 == "2" ~ "0"
   ))
+
 # make survey design object
 designf <-svydesign(ids=kid_hbv_kr_dis$hv001, strata=kid_hbv_kr_dis$hv022 , weights=kid_hbv_kr_dis$hh_weight,  data=kid_hbv_kr_dis)
 options(survey.lonely.psu="adjust")
@@ -82,14 +83,14 @@ designf_dhs2 <-as_survey_design(designf)
 # run for hbvresultlowna and hbvresultlowpos as outcome vars
 
 # age
-kid_age <- svyglm(hbvresultlowpos ~ as.factor(hv105), designf_dhs2, family=quasibinomial("log"))
+kid_age <- svyglm(hbvresult5 ~ as.factor(hv105), designf_dhs2, family=quasibinomial("log"))
 kid_age <- svyglm(hbvresultlowpos ~ as.factor(hv105), designf_dhs2, family=quasibinomial("identity"))
 summary(kid_age)
 confint(kid_age)
 
 # sex
-kid_mf <- svyglm(hbvresultlowna ~ as.factor(hv104), designf_dhs2, family=quasibinomial("log"))
-kid_mf <- svyglm(hbvresultlowna ~ as.factor(hv104), designf_dhs2, family=quasibinomial("identity"))
+kid_mf <- svyglm(hbvresult5 ~ as.factor(hv104), designf_dhs2, family=quasibinomial("log"))
+kid_mf <- svyglm(hbvresult5 ~ as.factor(hv104), designf_dhs2, family=quasibinomial("identity"))
 summary(kid_mf)
 confint(kid_mf)
 
