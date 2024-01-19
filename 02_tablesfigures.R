@@ -126,20 +126,34 @@ kid_dhs_int <- kid_dhs_int %>% mutate(
     is.nan(sh318f) ~ NA_real_))  
 table(kid_dhs_int$jaundice, kid_dhs_int$hbvresult, useNA = "always")
 
+#**updated file for kids********** ##########
+## additional variables
+# other vars: shteta
+table(kid_dhs_int$shteta, useNA = "always")
+
+kid_dhs_int <- kid_dhs_int %>% mutate(
+  shtetaindasno = case_when(
+    shteta=="0" ~ 0,
+    shteta=="1" ~ 1,
+    shteta=="3" ~ 0),
+  shtetaindasyes = case_when(
+    shteta=="0" ~ 0,
+    shteta=="1" ~ 1,
+    shteta=="3" ~ 1))
+
+#kid_hbv_kr_dis from other R files------------
 # make survey design object
-designf <-svydesign(ids=kid_dhs_int$hv001, strata=kid_dhs_int$hv022 , weights=kid_dhs_int$hh_weight,  data=kid_dhs_int)
+designf <-svydesign(ids=kid_hbv_kr_dis$hv001, strata=kid_hbv_kr_dis$hv022 , weights=kid_hbv_kr_dis$hh_weight,  data=kid_hbv_kr_dis)
 options(survey.lonely.psu="adjust")
 designf_dhs2 <-as_survey_design(designf)
 
-# which HBV outcome var
-table(kid_dhs_int$hbvresultlowna) # low/na results included as 0 (low/na = 46)
-table(kid_dhs_int$hbvresult) # low/na dropped
-table(kid_dhs_int$catresult) # categorical with low/na as own column
+# which HBV outcome var: main analysis is hbvresult5, hbvresultlow5, hbvresultlowpos5
+# sensitivity analyses: 1, 2, 100
 
 # basic stats
 # overall weighted hbv prevalence among children with results
-prop.table(svytable(~hbvresult, designf_dhs2))
-svyciprop(~hbvresult, designf_dhs2, method="lo")
+prop.table(svytable(~hbvresult5, designf_dhs2))
+svyciprop(~hbvresult5, designf_dhs2, method="lo")
 
 # antibodies: shroug, shorei, shrube
 svytotal(~shroug, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
@@ -148,17 +162,14 @@ svytotal(~shrube, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") %>% clipr::
 
 svyby(~shroug,~shorei, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
 svyby(~shroug,~shrube, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-table(Mumps=kid_dhs_int$shorei, Measles=kid_dhs_int$shroug)
 svyby(~shorei,~shrube, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
-table(Mumps=kid_dhs_int$shorei, Rubella=kid_dhs_int$shrube, useNA = "always")
 
 class(kid_dhs_int$shrube)
 class(kid_dhs_int$shroug)
 class(kid_dhs_int$shorei)
 table(kid_dhs_int$shorei)
-table(Mumps=kid_dhs_int$shorei, Rubella=kid_dhs_int$shrube, Measles=kid_dhs_int$shroug,useNA = "always")
-kid_dhs_int %>% count(shroug,shorei,shrube)
-
+table(Mumps=kid_hbv_kr_dis$shorei, Rubella=kid_hbv_kr_dis$shrube, Measles=kid_hbv_kr_dis$shroug,useNA = "always")
+kid_hbv_kr_dis %>% count(shroug,shorei,shrube)
 
 # create functions to calculate weighted n
 # running functions pastes the results to clipboard which you can then copy into excel
@@ -170,7 +181,7 @@ survtable_all <- function(var){
 
 # counts for n in dataset, stratified by HBV Y or N
 survtable <- function(var){ 
-  svyby(as.formula(paste0('~', var)),~hbvresultlowna, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+  svyby(as.formula(paste0('~', var)),~hbvresult5, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
 }
 
 # mean for continous vars in dataset
@@ -180,11 +191,13 @@ survmean_all <- function(var){
 
 # mean for continuos vars in dataset, stratified by HBV Y or N
 survmean <- function(var){ 
-  svyby(as.formula(paste0('~', var)),~hbvresultlowna, designf_dhs2, svymean, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+  svyby(as.formula(paste0('~', var)),~hbvresult5, designf_dhs2, svymean, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
 }
 
 # get results for vars of interest
-survtable_all("catresult") # overall n
+survtable_all("catresult5") # overall n
+# unweighted for comparison
+table(kid_hbv_kr_dis$catresult5, useNA = "always")
 
 # continuous data: hhmem_n (number of household members), agenum (age)
 survmean_all("agenum")
@@ -194,8 +207,107 @@ survmean_all("hhmem_n")
 survmean("hhmem_n")
 
 # categorical data
-catvars <- c("catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
-# other variables of interest: hv026 (place of residence: 0=capital, large city, 1=small city, 2=town, 3=countryside, 9=missing)
+catvars <- c("catresult5","catresult1", "catresult2", "catresult100","totalkidpos_f","hv104", "hv024", "hv025","hv026","hv270", "pfldh_kids","shtetaindasno","shtetaindasyes","prov2015") 
+# resuming weighted counts "hv025","hv270","pfldh_kids", hv105 (1-year age)
+
+# Age
+survtable_all("hv105") #
+survtable("hv105") #
+# Sex 0=female, 1=male
+survtable_all("sex") #
+survtable("sex") #
+# urban rural:  hv025=urban(1)/rural(2)
+survtable_all("hv025") # 
+survtable("hv025") # 
+# type of location hv026: 0=capital (provincial); 1=small city; 2=town; 3=countryside
+survtable_all("hv026") # 
+survtable("hv026") # 
+# province
+survtable_all("prov2015") # 
+survtable("prov2015") # 
+# household wealth
+survtable_all("hv270") #
+survtable("hv270") #
+#pf malaria
+survtable_all("pfldh_kids") #
+survtable("pfldh_kids") #
+# tetanus - variable from dataset
+survtable_all("shteta") 
+survtable("shteta")
+# indeterminate as no antibodies
+survtable_all("shtetaindasno") 
+survtable("shtetaindasno")
+# indeterminant as yes antibodies
+survtable_all("shtetaindasyes") 
+survtable("shtetaindasyes")
+# number of kids positive 
+survtable_all("totalkidpos_f") #
+survtable("totalkidpos_f") # since there are 0 counts by design, need to run outside the function
+svyby(~totalkidpos_f,~hbvresult5, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") 
+
+# nutritional status: sevstunt, modstunt, stunt,sevwasting, modwasting, wasting, underweight
+# anemia: 1- severe; 2-moderate; 3 -mild; 4- not anemic; NaN - missing
+survtable_all("hc57") # anemia
+survtable("hc57")
+# stunting: 0-no stunt; 1-moderate; 2-severe; 9-missing
+survtable_all("stunt") 
+survtable("stunt")
+# wasting: 0-no stunt; 1-moderate; 2-severe; 9-missing
+survtable_all("wasting") 
+survtable("wasting")
+# underweight
+survtable_all("underweight") 
+survtable("underweight")
+
+kid_hbv_kr_dis$pfldh <- as.numeric(kid_hbv_kr_dis$pfldh)
+# prevalence by sex (rather than division of sex by positives and negatives), with CI
+svyby(~hbvresult5,~hv104, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
+svyby(~hbvresult5,~hv105, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
+svyby(~hbvresult5,~pfldh, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
+svyby(~pfldh,~hbvresult5, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
+class(kid_hbv_kr_dis$pfldh)
+table(kid_hbv_kr_dis$pfldh_kids)
+table(kid_hbv_kr_dis$pfldh)
+##Anthro diff denom------------
+# anemia
+table(kid_hbv_kr_dis$hc57,kid_hbv_kr_dis$stunt, useNA = "always" )
+anthro_kid_hbv_kr_dis <- kid_hbv_kr_dis %>% filter(!is.nan(hc57))
+# make survey design object
+designf_a <-svydesign(ids=anthro_kid_hbv_kr_dis$hv001, strata=anthro_kid_hbv_kr_dis$hv022 , weights=anthro_kid_hbv_kr_dis$hh_weight,  data=anthro_kid_hbv_kr_dis)
+designf_dhs2a <-as_survey_design(designf_a)
+# stunting with different denom
+svyby(~hc57,~hbvresult5, designf_dhs2a, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+
+
+anthro_kid_hbv_kr_dis <- kid_hbv_kr_dis %>% filter(!is.na(stunt))
+# make survey design object
+library(srvyr)
+library(survey)
+designf_a <-svydesign(ids=anthro_kid_hbv_kr_dis$hv001, strata=anthro_kid_hbv_kr_dis$hv022 , weights=anthro_kid_hbv_kr_dis$hh_weight,  data=anthro_kid_hbv_kr_dis)
+options(survey.lonely.psu="adjust")
+designf_dhs2a <-as_survey_design(designf_a)
+# stunting with different denom
+svyby(~stunt,~hbvresult5, designf_dhs2a, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+
+# wasting
+anthro_kid_hbv_kr_dis <- kid_hbv_kr_dis %>% filter(!is.na(wasting))
+# make survey design object
+designf_a <-svydesign(ids=anthro_kid_hbv_kr_dis$hv001, strata=anthro_kid_hbv_kr_dis$hv022 , weights=anthro_kid_hbv_kr_dis$hh_weight,  data=anthro_kid_hbv_kr_dis)
+designf_dhs2a <-as_survey_design(designf_a)
+# stunting with different denom
+svyby(~wasting,~hbvresult5, designf_dhs2a, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+
+# underweight
+anthro_kid_hbv_kr_dis <- kid_hbv_kr_dis %>% filter(!is.nan(underweight))
+# make survey design object
+designf_a <-svydesign(ids=anthro_kid_hbv_kr_dis$hv001, strata=anthro_kid_hbv_kr_dis$hv022 , weights=anthro_kid_hbv_kr_dis$hh_weight,  data=anthro_kid_hbv_kr_dis)
+designf_dhs2a <-as_survey_design(designf_a)
+# stunting with different denom
+svyby(~underweight,~hbvresult5, designf_dhs2a, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
+
+
+
+# misc checks
 # 
 table(adults2023int$hv041, adults2023int$hbvresult)
 table(adults2023int$hc16, useNA = "always")
@@ -253,52 +365,6 @@ kid_dhs_int <- kid_dhs_int %>% mutate(originalcallclean = case_when(
 addmargins(table(kid_dhs_int$originalcall, kid_dhs_int$originalcallclean))
 table(kid_dhs_int$shnprovin, kid_dhs_int$originalcallclean)%>% clipr::write_clip()
 
-# resuming weighted counts "hv025","hv270", "hv228", "pfldh_kids", hv105 (1-year age)
-
-survtable_all("hv105") #
-survtable("hv105") #
-
-survtable_all("hv025") #
-survtable("hv025") #
-survtable_all("hv270") #
-survtable("hv270") #
-
-# children sleeping under bednet
-survtable_all("hv228") #
-survtable("hv228") # 
-
-survtable_all("pfldh_kids") #
-survtable("pfldh_kids") #
-
-# other vars: shteta
-table(kid_dhs_int$shteta, useNA = "always")
-
-kid_dhs_int <- kid_dhs_int %>% mutate(
-  shtetaindasno = case_when(
-    shteta=="0" ~ 0,
-    shteta=="1" ~ 1,
-    shteta=="3" ~ 0),
-  shtetaindasyes = case_when(
-    shteta=="0" ~ 0,
-    shteta=="1" ~ 1,
-    shteta=="3" ~ 1))
-
-table(kid_dhs_int$shtetaindasyes, useNA = "always")
-table(kid_dhs_int$shtetaindasno, useNA = "always")
-table(kid_dhs_int$hbvresult, useNA = "always")
-
-survtable_all("shteta") 
-survtable("shteta")
-# nutritional status: sevstunt, modstunt, stunt,sevwasting, modwasting, wasting, underweight
-survtable_all("hc57") # anemia
-survtable("hc57")
-survtable_all("stunt") 
-survtable("stunt")
-survtable_all("wasting") 
-survtable("wasting")
-survtable_all("underweight") 
-survtable("underweight")
-# age by province by hbv
 
 table(kid_dhs_int$hbvresult)
 pos <- kid_dhs_int %>% filter(hbvresult==1)
@@ -572,258 +638,6 @@ k08_int_2023_adults <- print(k08_int_2023_adults, nonnormal = allvars , exact = 
 write.csv(k08_int_2023_adults, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/k08_int_2023_adults.csv")
 
 
-
-# Map-------------------------
-library(sf)
-library(gstat)
-library(stars)
-library(tidyverse)
-library(patchwork)
-library(sp)
-
-dhsmeta <- readRDS("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/DHS_pr_full_merge_backup.rds")
-
-## kids map-----
-dhsmeta_kids <- dhsmeta %>% filter(kids==1)
-nrow(dhsmeta_kids)
-class(dhsmeta_kids$geometry) # saved as character not list
-head(dhsmeta_kids$geometry) # saved as character not list
-
-
-
-# redo sf geometry
-kidmapsf = st_as_sf(kid_hbv_kr_dis[!is.na(kid_hbv_kr_dis$latnum) &!is.na(kid_hbv_kr_dis$longnum),], coords = c("longnum", "latnum"), crs = 4326) 
-# evaluate the 6997-6973 that didn't map
-head(kidmapsf$geometry)
-nogpskid <- kid_dhs_int %>% filter(!(cluster_hh %in% kidmapsf$cluster_hh)) %>% select(c("cluster_hh","latnum", "longnum","shnprovin","adm1fips","adm1name","catresult" ))
-
-# from 06_mappingextra.R, use kidsmap_impsf, which has imputed GPS
-sf_use_s2(F)
-
-# subset cluster level df to get weights
-output_df <- kid_hbv_kr_dis %>% 
-  group_by(hv001) %>%
-  dplyr::summarize(n=n(),
-                  # npos = n(hbvresultlowna),
-                   prev = mean(hbvresultlowna, na.rm=T)*100)
-
-output_df <- merge(output_df, kid_hbv_kr_dis[,c("hh_weight","hv001")],by="hv001", all.x = TRUE)
-
-# GADM boundaries from: https://gadm.org/download_country_v3.html
-admin0 <- readRDS('/Users/camillem/Documents/GitHub/animalaria/admin0.rds') %>%          # GADM admin0 boundaries
-  st_transform(4326) %>% # set at ESPG 4326
-  filter(grepl('Congo|Rwanda|Tanzania|Burundi|African Republic|Angola|Zambia|Uganda|Sudan|Gabon|Cameroon|Equatorial Guinea', Country)) 
-
-st_crs(admin0) # view CRS
-
-DRC <- admin0 %>% filter(Country=='Democratic Republic of the Congo') # DRC
-
-
-summary(kidmapsf$hh_weight)
-
-table(kidmapsf$shteta)
-
-output <- kidsmap_impsf %>% 
-  group_by(hv001) %>%
-  dplyr::summarize(n=n(),
-                   npos = sum(hbvresultlowna==1),
-                   prev = mean(hbvresultlowna, na.rm=T)*100,
-                   tetcovlower = mean(shtetaindasno, na.rm=T)*100,
-                   tetcovupper = mean(shtetaindasyes, na.rm=T)*100)
-view(output)
-# remove points where geometry is outside of DRC outline (geometry=c(0,0))
-output_points <- st_join(output, DRC, join = st_intersects) %>% filter(!is.na(Country))
-
-# simple map of dhs cluster locations with kid samples
-drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%   st_transform(4326)
-
-ggplot() + 
-  geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
-  geom_sf(data=DRC, fill="cornsilk") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, alpha=0.8) + 
-  labs(color='HBV prevalence \nin children < 5') + 
-  theme_bw(base_size=14) + 
-  scale_color_distiller(palette = 'Spectral') + 
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  #ggtitle("Children ≤ 5")+ # for adding with adult figure
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA))
-ggsave("./Plots/dhslocs.png", width = 9, height = 6)
-
-
-A <- 
-  ggplot() + 
-  geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
-  geom_sf(data=DRC, fill="cornsilk") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=prev), alpha=0.8) + 
-  labs(color='HBV prevalence (%) \nin children < 5') + 
-  theme_bw(base_size=14) + 
-  scale_color_distiller(palette = 'Spectral') + 
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  #ggtitle("Children ≤ 5")+ # for adding with adult figure
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA))
-A
-ggsave("./Plots/clusterhbvprev.png", width = 9, height = 6)
-
-C <- 
-  ggplot() + 
-  geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
-  geom_sf(data=DRC, fill="cornsilk") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=tetcovlower), alpha=0.8) + 
-  labs(color='Pentavalent vaccination \nin children < 5') + 
-  theme_bw(base_size=14) + 
-  scale_color_distiller(palette = 'Spectral', direction=1) + 
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA))
-
-# kriging using gstat: https://rpubs.com/nabilabd/118172 
-# https://mgimond.github.io/Spatial/interpolation-in-r.html#generate-the-variance-and-confidence-interval-maps
-
-# make variogram
-m.vgm <- gstat::variogram(prev~1, output_points)
-
-# fit a model to the sample variogram
-# https://gisgeography.com/semi-variogram-nugget-range-sill/
-m.fit <- gstat::fit.variogram(m.vgm, model=vgm(psill=480,"Exp",range=300, nugget=250))
-
-# plot
-plot(m.vgm,m.fit)
-
-# simple kriging
-spDRC <- as_Spatial(DRC)
-grd <- makegrid(spDRC, n = 50000)# making grid of points
-colnames(grd) <- c('x','y')
-grd_pts <- SpatialPoints(coords = grd, 
-                         proj4string=CRS(proj4string(spDRC)))
-
-# find all points in `grd_pts` that fall within DRC outline
-grd_pts_in <- grd_pts[spDRC, ]
-
-# transform grd_pts_in back into a data frame
-gdf <- as.data.frame(coordinates(grd_pts_in)) 
-
-# conduct kriging: Pf prev
-m.kriged <- gstat::krige(prev~1, output_points, st_as_sf(grd_pts_in), model=m.fit)
-summary(m.kriged$var1.pred)
-
-# assign points into bins
-krige <- m.kriged %>% cbind(gdf$x, gdf$y) %>% mutate(
-  #var1.pred = cut(var1.pred, breaks=seq(0,15,by=1)), 
-  var1.pred_cut = case_when(
-    var1.pred <= 0 ~ 0,
-    var1.pred > 0 & var1.pred <= 2 ~ 2,
-    var1.pred > 2 & var1.pred <= 7 ~ 7,
-    var1.pred > 7 & var1.pred ~ 9),
-  var1.pred_largegrp = cut(var1.pred, breaks = seq(0,14, by=1)),
-  var1.pred_largegrp = ifelse(is.na(var1.pred_largegrp),0,var1.pred_largegrp),
-  var1.pred_largegrp2 = cut(var1.pred, breaks = seq(0,14, by=2)),
-  var1.pred_largegrp2 = ifelse(is.na(var1.pred_largegrp2),0,var1.pred_largegrp2),
-  #var1.pred_largegrp2 = cut(var1.pred, breaks = c(0,1,2,3,4,5,6,7,8,9,10), include.lowest = T),
-  se = sqrt(var1.var),
-  se = cut(se, breaks=seq(0,24,by=4))) %>% filter(!is.na(var1.pred))
-
-table(krige$var1.pred_cut)
-table(krige$var1.pred_cut,krige$var1.pred_largegrp, useNA = "always")
-table(krige$var1.pred_largegrp2, useNA = "always")
-
-# factor for prev
-ggplot() + 
-  geom_tile(data=(krige %>% as.data.frame), aes(x=gdf.x,y=gdf.y,fill=as.factor(var1.pred_cut))) + 
-  geom_sf(data=admin0 %>% filter(ISO != 'COD'), fill="cornsilk2", color="cornsilk3") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  labs(fill="Predicted HBV \nprevalence, \nchildren ≤5", x='', y='') + 
-  theme_bw(base_size=14) + 
-  scale_fill_manual(values = c("#3288BD","#FFFFBF","#FDAE61", "#9E0142") , labels=c("0","≤2%","2-7%",">7%")) +
-  #scale_fill_brewer(palette ="Spectral", direction=-1 , labels=c("0","≤2%","2-7%",">7%")) +
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA))
-
-B <- 
-  ggplot() + 
-  geom_tile(data=(krige %>% as.data.frame), aes(x=gdf.x,y=gdf.y,fill=as.factor(var1.pred_largegrp2))) + 
-  geom_sf(data=admin0 %>% filter(ISO != 'COD'), fill="cornsilk2", color="cornsilk3") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  labs(fill="Predicted HBV \nprevalence, \nchildren ≤5", x='', y='') + 
-  theme_bw(base_size=14) + 
-  scale_fill_brewer(palette ="Spectral", direction=-1, labels=c("0","1-2","3-4","5-6","7-8","9-10","11-12","13-14"))+
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA))
-B
-ggsave("./Plots/krighbvprev.png", width = 9, height = 6)
-
-
-# conduct kriging: tetanus vacc - lower bound
-m.kriged.tet <- gstat::krige(tetcovlower~1, output_points, st_as_sf(grd_pts_in), model=m.fit)
-summary(m.kriged.tet$var1.pred)
-
-# assign points into bins
-krige_tetlow <- m.kriged.tet %>% cbind(gdf$x, gdf$y) %>% mutate(
-  var1.pred = cut(var1.pred, breaks=seq(0,90,by=10)), 
-  se = sqrt(var1.var),
-  se = cut(se, breaks=seq(0,24,by=4))) %>% filter(!is.na(var1.pred))
-
-D <- 
-  ggplot() + 
-  geom_tile(data=(krige_tetlow %>% as.data.frame), aes(x=gdf.x ,y=gdf.y, fill=var1.pred)) + 
-  geom_sf(data=admin0 %>% filter(ISO != 'COD'), fill="cornsilk2", color="cornsilk3") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  labs(fill="Predicted pentavalent \nvaccination", x='', y='') + 
-  theme_bw(base_size=14) + 
-  scale_fill_brewer(palette ="Spectral", direction=1, labels=c("0-10","11-20","21-30","31-40","41-50","51-60","61-70","71-80","81-90")) +
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA))
-D
-A + B + C + D + plot_layout(nrow=2, ncol = 2) + plot_annotation(tag_levels = 'A')
-ggsave('./Plots/2x2.png', width=15, height=9)
-
-# where left off Nov 6----
-# make indicator var for imputed vs not
-# overlay cluster points with surfaces
-# test out different imputed locations to see how maps vary
-# consider centroid and way of sampling multiple
-
-
-
-
 ## adults map---------------------------------------------------------------
 # case/control hh of adults
 table(adults2023int$case5final, adults2023int$hbvresult, useNA = "always")
@@ -1043,30 +857,7 @@ table(kidmapsf$agenum, kidmapsf$shtetaindasno, useNA = "always")
 table(kidmapsf$agenum, kidmapsf$hbvresultlowna, useNA = "always")
 
 
-# Choropleth ------------------
-drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%   st_transform(4326)
 
-wtdctskids <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx",
-                         sheet = "May 5")
-
-wtdctskids$ADM1_NAME <- toupper(wtdctskids$provnamesimp)
-drcprov_hbvkids <- left_join(drcprov,wtdctskids, by="ADM1_NAME")
-view(drcprov_hbvkids)
-
-ggplot()+
-  geom_sf(data=admin0, fill="cornsilk2", color="cornsilk3") +
-  geom_sf(data=drcprov_hbvkids,  mapping=aes(fill=prev))+
-  scale_fill_distiller(palette = 'Spectral') +
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  ggtitle("Weighted HBV prevalence in kids ≤5")+
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA))
-ggsave("./Plots/kidprev.png", width = 9, height = 6)
 
 # adults choropleth
 casehh <- adults2023int_hiv %>% filter(case5final == 1)
