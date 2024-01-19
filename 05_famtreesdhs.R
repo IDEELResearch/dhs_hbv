@@ -108,6 +108,19 @@ d_k_or_red <- d_k_or %>% select(c(clus_hh_ind,v001,v002,b16,midx,v006,v007,v008,
                                    bord, b0, b1, b2, b3, b8, b11, b12, b15, b16, seligdv, s1323, s1324, h3, h5, h7, h10, starts_with("h15"),
                                   v477, v478, v480, v501, v502, v503, v504, v505, v506, v507, v508, v525, v527, v528, v529, v530, v531, v532,
                                   v743f, starts_with("v744"),snprovin, v003, hw51, s1202, s1208, v034)) # s1323, s1324 not available for kids with dbs
+table(d_k_or$s114) # ethnicity
+#s114 ethnicity
+# 11 "Bakongo Nord & Sud" 
+# 12 "Bas-Kasai et Kwilu-Kwngo"
+# 13 "Cuvette central"
+# 14 "Ubangi et Itimbiri"
+# 15 "Uele Lac Albert"
+# 16 "Basele-K , Man. et Kivu"
+# 17 "Kasai, Katanga, Tanganika"
+# 18 "Lunda"
+# 19 "PygmÈe"
+# 96 "Other"
+
 # then run:
 kid_hbv_kr <- left_join(kid_dhs_int,d_k_or_red, by = "clus_hh_ind" )
 kid_hbv_kr %>% filter(is.na(v001)) %>% count(v001)
@@ -154,7 +167,6 @@ table(kid_prnokr_check$hc60, useNA = "always")
 kid_hbv_kr_dis <- kid_hbv_kr %>% distinct(dbsbarcode, .keep_all = TRUE)
 # should use this in the below
 
-
 # merge kids and hh members 
 kids4mrg <- kid_hbv_kr %>% select(c(cluster_hh, hv001, hv002, hvidx, dbsbarcode, clus_hh_ind, agegrp, hv105, hv104, hbvresultlowna ))
 kids4mrg <- kids4mrg %>% rename(hbv=hbvresultlowna) 
@@ -163,7 +175,8 @@ nrow(kids4mrg)
 kids4mrg <- kids4mrg %>% distinct(dbsbarcode, .keep_all = TRUE)
 nrow(kids4mrg)
 # why are 6996 - 6851 = 145 duplicated?
-
+view(adults4mrg)
+nrow(adults4mrg)
 adults4mrg <- adults2023int_hiv_nodrop %>% select(c(cluster_hh, hv001, hv002, hvidx, dbsbarcode, agegrp, hv105, hv104, case5final, hbvresult))
 adults4mrg$clus_hh_ind <- paste(adults4mrg$hv001, adults4mrg$hv002, adults4mrg$hvidx, sep = "_")
 adults4mrg <- adults4mrg %>% rename(hbv=hbvresult)
