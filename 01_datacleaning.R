@@ -485,8 +485,15 @@ facet_wrap(~shnprovin)
 
 # adults
 
+# BELOW ALL REVISED Jan 19 - work through above
 #Vars from KR-----------------------------
 # see 05_famtreesdhs.R for merge of biospecimen results, PR, and KR (asked to caretakers about children, able to merge ~75%)
+
+# variables from KR
+# clus_hh_ind,v001,v002,b16,midx,v006,v007,v008,v011,v012,v044, v136, v137, v138, v150, m15, m17, m18,
+# bord, b0, b1, b2, b3, b8, b11, b12, b15, b16, seligdv, s1323, s1324, h3, h5, h7, h10, starts_with("h15"),
+# v477, v478, v480, v501, v502, v503, v504, v505, v506, v507, v508, v525, v527, v528, v529, v530, v531, v532,
+# v743f, starts_with("v744"),snprovin, v003, hw51, s1202, s1208, v034
 
 # 1. DPT vaccination
 kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(
@@ -536,22 +543,6 @@ kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(beat = case_when(
 ))
 table(kid_hbv_kr_dis$beat, kid_hbv_kr_dis$v744a)
 
-# variables from KR
-# clus_hh_ind,v001,v002,b16,midx,v006,v007,v008,v011,v012,v044, v136, v137, v138, v150, m15, m17, m18,
-# bord, b0, b1, b2, b3, b8, b11, b12, b15, b16, seligdv, s1323, s1324, h3, h5, h7, h10, starts_with("h15"),
-# v477, v478, v480, v501, v502, v503, v504, v505, v506, v507, v508, v525, v527, v528, v529, v530, v531, v532,
-# v743f, starts_with("v744"),snprovin, v003, hw51, s1202, s1208, v034
-
-# age variable - hv105 or hc1 
-ggplot(kid_hbv_kr_dis) +
-  geom_violin(aes(x=as.numeric(hc1), y=(hv105)))+
-  geom_point(aes(x=as.numeric(hc1), y=(hv105)))+
-  geom_vline(xintercept=12)+
-  geom_vline(xintercept=24)+
-  geom_vline(xintercept=36)+
-  geom_vline(xintercept=48)+
-  geom_vline(xintercept=60)
-class(kid_hbv_kr_dis$hc1)
 
 kid_hbv_kr_dis$hc1 <- as.numeric(kid_hbv_kr_dis$hc1)
   
@@ -567,8 +558,3 @@ kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(hv105_fromhc1 = case_when(
     hv105_fromhc1 == hv105 ~ 1,
     hv105_fromhc1 != hv105 ~ 0
   ))
-
-table(kid_hbv_kr_dis$hv105_fromhc1, useNA = "always")  
-table(test$hv105_fromhc1, test$hv105, useNA = "always")  
-test %>% group_by(discr) %>%  summarise(count = n() / nrow(.) )
-table(test$discr, useNA = "always")  
