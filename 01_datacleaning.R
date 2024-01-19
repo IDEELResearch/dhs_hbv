@@ -9,7 +9,6 @@ drchiv <- read.dta("/Users/camillem/Documents/GitHub/dhs_hbv/Data/CDAR61DT/CDAR6
 # kids 
 d_k_or <- read.dta("/Users/camillem/Documents/GitHub/dhs_hbv/Data/CDKR61DT/CDKR61FL.DTA", convert.factors = FALSE)
 
-
 # load data
 dhsmeta <- readRDS("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/DHS_pr_full_merge_backup.rds")
 
@@ -120,19 +119,20 @@ k08testing <- k08testing %>% mutate(
     catresult=="reactive" ~ 1,
     catresult=="nonreactive" ~ 0,
     TRUE ~ NA_real_))
-
+table(k08testing$catresult)
 # merge abbott results onto k08 results
 # for abbott results: want all kid results, and only the adults that were case/control household members-use abbyesno for list of those selected
 abbott$k08orabb <- "Abbott"
 # make barcodes lowercase in abbott results dataset
-abbott$dbsbarcode <- tolower(abbott$barcodes)
+abbott$d %>% bsbarcode <- tolower(abbott$barcodes)
 # make barcodes lowercase in abbott indicator dataset
 abbyesno$dbsbarcode <- tolower(abbyesno$barcodes)
 
 # select abbot results only for kids or for those who were selected for sampling
 abbott_selected <- abbott %>% filter(KidSample==1 | dbsbarcode %in% abbyesno$dbsbarcode)
 # 277 kids + 54 adults = correct
-
+view(abbott_selected)
+table(abbott_selected$agegrp)
 abbott_selected <- abbott_selected %>% mutate(
   agegrp = case_when(
     KidSample== 1 ~ "kid",
@@ -300,16 +300,17 @@ kid_dhs_int <- kid_dhs_int %>%
     round2call == "Nonreactive" ~ "nonreactive", # since tube is gold standard, using this result (3 of 45 mismatch were >100)
     # next: important decision: for those not retested, what cutoff used
     round2call=="Not retested" & round1sco_1 >= 2 ~ "reactive", # not retested but first round >=2
-    round2call=="searching" & round1sco_1 >= 2 ~ "reactive", # can't find result but first round >5
-    round2call=="Not retested" & round1sco_1 < 2 ~ "nonreactive", # not retested but first round <5
-    round2call=="searching" & round1sco_1 < 2 ~ "nonreactive", # can't find result but first round <5
+    round2call=="searching" & round1sco_1 >= 2 ~ "reactive", # can't find result but first round >2
+    round2call=="Not retested" & round1sco_1 < 2 ~ "nonreactive", # not retested but first round <2
+    round2call=="searching" & round1sco_1 < 2 ~ "nonreactive", # can't find result but first round <2
     # low vol - set to missing
     round1call == "low volume" ~ "low vol", # n=47
     round1call == "missing" ~ NA_character_, # n=1
     TRUE ~ NA_character_))
 kid_dhs_int %>% filter(round1call=="REACTIVE") %>% reframe(round1call, round2call)
 
-table(kid_dhs_int$round2call)
+table(kid_dhs_int$catresult)
+table(kid_dhs_int$catresult2)
 
 # data exploration------------------------------------------------------------------------
 # using dataset with no missing (ie no low volume)
@@ -541,5 +542,33 @@ table(kid_hbv_kr_dis$beat, kid_hbv_kr_dis$v744a)
 # v477, v478, v480, v501, v502, v503, v504, v505, v506, v507, v508, v525, v527, v528, v529, v530, v531, v532,
 # v743f, starts_with("v744"),snprovin, v003, hw51, s1202, s1208, v034
 
+# age variable - hv105 or hc1 
+ggplot(kid_hbv_kr_dis) +
+  geom_violin(aes(x=as.numeric(hc1), y=(hv105)))+
+  geom_point(aes(x=as.numeric(hc1), y=(hv105)))+
+  geom_vline(xintercept=12)+
+  geom_vline(xintercept=24)+
+  geom_vline(xintercept=36)+
+  geom_vline(xintercept=48)+
+  geom_vline(xintercept=60)
+class(kid_hbv_kr_dis$hc1)
 
+kid_hbv_kr_dis$hc1 <- as.numeric(kid_hbv_kr_dis$hc1)
+  
+kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(hv105_fromhc1 = case_when(
+  hc1 < 12 ~ 0, # kids below 6mo = 0 years
+  hc1 >= 12 & hc1 <24 ~ 1, #  kids 12-<24mo = 1 years
+  hc1 >= 24 & hc1 <36 ~ 2, # kids 24=<36 = 2 years
+  hc1 >= 36 & hc1 <48 ~ 3, # kids 36-<48 = 3 years
+  hc1 >= 48 & hc1 <60 ~ 4, # kids 48-<60 = 4 years
+  hc1 >= 60 ~ 5, # kids >=60mo = 5years
+),
+  discr = case_when(
+    hv105_fromhc1 == hv105 ~ 1,
+    hv105_fromhc1 != hv105 ~ 0
+  ))
 
+table(kid_hbv_kr_dis$hv105_fromhc1, useNA = "always")  
+table(test$hv105_fromhc1, test$hv105, useNA = "always")  
+test %>% group_by(discr) %>%  summarise(count = n() / nrow(.) )
+table(test$discr, useNA = "always")  
