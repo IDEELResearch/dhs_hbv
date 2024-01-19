@@ -7,33 +7,7 @@ library(tidyverse)
 # SH322                  Taking cta to treat the malaria    1  Yes, CTA; 2  Yes, other CTA; 3  Yes, other; 4  No
 # sh327                  Result code of malaria treatment and referral: 1  Medication given; 2  Meds refused; 3  Severe malaria referral
 #                        4  Already taking meds referral; 6  Other
-# SHROUG - measles Ab 0=neg, 1=pos, 3=undetermined
-# SHOREI - mumps Ab
-# SHRUBE - rubella Ab
-# SHVARI - varicella/chicken pox
-# SHTETA - tetatnus Ab
 
-table(dhsmeta$hv112) 
-table(kid_dhs_int$sh322, kid_dhs_int$hbvresultlowna, useNA = "always")
-addmargins(table(Measles = kid_dhs_int$shroug, Mumps = kid_dhs_int$shorei, useNA = "always"))
-addmargins(table(Rubella = kid_dhs_int$shrube, Mumps = kid_dhs_int$shorei, useNA = "always"))
-
-library(eulerr)
-fit <- euler(c(A = kid_dhs_int$shroug, B = kid_dhs_int$shorei, "A&B" = 230))
-plot(fit)
-library(ggvenn)
-
-vacc <- kid_dhs_int %>% select(c("dbsbarcode","shroug","shorei","shrube","shvari", "shteta","hbvresultlowna"))
-
-venn.diagram(x=list(kid_dhs_int))
-vacc %>%
-  mutate(across(starts_with("sh"), as.logical)) %>%
-  ggplot() +
-  geom_venn(aes(A = shroug, B = shorei, C = shrube))
-
-
-table(dhsmeta$hv112) 
-table(dhsmeta$v003)
 
 # hiv dataset from 01_datacleaning.R
 view(drchiv_sel)
@@ -46,9 +20,6 @@ adults2023int_wdrop
 addmargins(table(adults2023int_hiv_nodrop$hv112, useNA = "always"))
 addmargins(table(adults2023int_hiv_nodrop$hv114))
 table(adults2023int_hiv_nodrop$case5final)
-
-
-table(kid_dhs_int$sh252c)
 
 # using d_k_or from CDKR61FL.DTA
 # subset to those with sample
@@ -84,8 +55,7 @@ d_k_or$clus_hh_ind <- paste(d_k_or$v001, d_k_or$v002, d_k_or$b16, sep = "_")
 head(kid_dhs_int$hv003)
 head(kid_dhs_int$hvidx)
 kid_dhs_int$clus_hh_ind <-  paste(kid_dhs_int$hv001, kid_dhs_int$hv002, kid_dhs_int$hvidx, sep = "_")
-nrow(kid_dhs_int)
-nrow(d_k_or)
+
 # per https://userforum.dhsprogram.com/index.php?t=msg&th=11867&goto=24903&S=Google, also need to account for b16 since neither PR nor KR is a subset of the other
 # instructional video https://www.youtube.com/watch?v=SJkJmtgaqBc
 addmargins(table(d_k_or$b16, useNA = "always"))
@@ -123,15 +93,7 @@ table(d_k_or$s114) # ethnicity
 
 # then run:
 kid_hbv_kr <- left_join(kid_dhs_int,d_k_or_red, by = "clus_hh_ind" )
-kid_hbv_kr %>% filter(is.na(v001)) %>% count(v001)
-# 1874 of 6996 do not have KR data - one of conditions above ()
-# describe the 1874 without KR data
-# mother's line number - maybe they are not living with their mother (hv112==0)
-addmargins(table(kid_hbv_kr$hv112, useNA = "always")) # 712 not living with mother
-addmargins(table(kid_hbv_kr$hv111,kid_hbv_kr$hv112, useNA = "always")) # 712 not living with mother
-addmargins(table(kid_hbv_kr$hv103,kid_hbv_kr$hv112, useNA = "always")) 
-addmargins(table(kid_hbv_kr$hv102,kid_hbv_kr$hv112, useNA = "always")) 
-
+# check hv111 (mother living), hv112 (living with mother)
 addmargins(table(kid_hbv_kr$v044, useNA = "always")) # selected domestic violence mod - appears none?
 
 kid_hbv_kr <- kid_hbv_kr %>% mutate(krabout = case_when(
@@ -348,15 +310,6 @@ check19k_sum <- check19k %>% group_by(cluster_hh) %>%
   dplyr::summarise(totkidsamp = sum(kids_barcode !=""), # kids selected for sampling
                    totadusamp = sum(hivrecode_barcode != ""),
                    notsamp = sum(dbsbarcode=="")) # adult selected for sampling
-view(check19k_sum)
-colnames(hhsum)
-check19k_sum$totalpositive <- 0
-check19k_sum$hhprev_samp <- 0
-check19k_sum$n_samp <- check19k_sum$totkidsamp + check19k_sum$totadusamp 
-check19k_sum$totadult_pos <- 0
-check19k_sum$totkid_pos <- 0
-check19k_sum$hhsize <- check19k_sum$notsamp + check19k_sum$n_samp
-view(check19k_sum)
 
 hhsize <- hhsize %>% filter(!(cluster_hh %in% check19k_sum$cluster_hh))
 # remove the 19 to add back the correct data
