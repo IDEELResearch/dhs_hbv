@@ -1,28 +1,21 @@
 # 02_tablesfigures.R
 
-# load packages
+#Load packages----------------
 library(tidyverse)
 library(tableone)
+library(survey)
+library(srvyr)
 # after 01_datacleaning.R has been compiled, use the data frame _____ for analysis
-
 kids2023 <- k08_nomiss_cc %>% filter(agegrp=="kid")
 
 # get kid file: kidresults (from Stane/Ana testing + Abbott$agegrp=="kid")
 # k08_all has everything before drop of missing
-table(k08_all$agegrp, useNA = "always")
-addmargins(table(k08_all$agegrp,k08_all$catresult, useNA = "always"))
-
 test <- k08_all %>% filter(agegrp=="kid" & catresult=="reactive") %>% summarise(dbsbarcode,k08orabb)
-table(test$k08orabb)
-
-
 kidresults$k08orabb <- "K08 testing"
 
 # fill non overlapping columns with NAs
 abbott_trim[setdiff(names(kidresults), names(abbott_trim))] <- NA
 #df2[setdiff(names(df1), names(df2))] <- NA
-
-table(kidresults$catresult, useNA = "always")
 
 kidresults <- kidresults %>% mutate(
   hbvresult = case_when(
@@ -32,35 +25,18 @@ kidresults <- kidresults %>% mutate(
 
 test <- rbind(abbott_trim[abbott_trim$agegrp=="kid",], kidresults)
 
-ncol(abbott_trim)
-ncol(kidresults)
-colnames(abbott_trim)
-colnames(kidresults)
-table(kidresults$hbvresult)
-
-addmargins(table(test$catresult, test$k08orabb ,useNA = "always"))
-addmargins(table(kidresults$catresult ,useNA = "always"))
-addmargins(table(test$catresult ,useNA = "always"))
-
-nrow(test)
 kid_dhs_int <- merge(dhsmeta,test,by="dbsbarcode" )
-nrow(kid_dhs_int)
+
 # 86 not merging with DHS - which
 whichno <- test %>% filter(!(dbsbarcode %in% kid_dhs_int$dbsbarcode))
-addmargins(table(whichno$catresult ,useNA = "always"))
-
 # use: kid_dhs_int
-addmargins(table(kid_dhs_int$catresult ,useNA = "always"))
 # remove the missing value
 kid_dhs_int <- kid_dhs_int %>% filter(!(is.na(catresult)))
-addmargins(table(kid_dhs_int$catresult ,useNA = "always"))
-
 
 #clean vars for table 1
 class(kid_dhs_int$hv105)
 kid_dhs_int$agenum <- as.numeric(kid_dhs_int$hv105)
 
-class(kid_dhs_int$hv009)
 kid_dhs_int$hhmem_n <- as.numeric(kid_dhs_int$hv009)
 
 # check kid with age 27
@@ -83,7 +59,7 @@ kid_dhs_int %>% count(totalkidpos,catresult)
 # analyze as categorical since median would be 0
 kid_dhs_int$totalkidpos_f <- as.character(kid_dhs_int$totalkidpos)
 
-#Create Table 1 for 2023 interim---------------
+#Unweighted Table 1---------------
 numvars <- c("agenum", "hhmem_n") # age, household size, 
 
 catvars <- c("catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
@@ -109,69 +85,22 @@ addmargins(table( kid_dhs_int$shnprovin, kid_dhs_int$catresult,useNA = "always")
 table(kid_dhs_int$sh310a)
 table(kid_dhs_int$catresult)
 
-##Weighted kids------------------------
+#JAN2024------------
+#Weighted children------------------------
 # add weight variable
-nrow(kid_dhs_int)
-kid_dhs_int <- kid_dhs_int %>% filter(hv105 != "27")
-nrow(kid_dhs_int)
+# kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
 
-kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
-library(survey)
-library(srvyr)
-
-kid_dhs_int <- kid_dhs_int %>% mutate(
-  jaundice = case_when(
-    sh318f == 1 ~ 1,
-    sh318f == 0 ~ 0,
-    is.nan(sh318f) ~ NA_real_))  
-table(kid_dhs_int$jaundice, kid_dhs_int$hbvresult, useNA = "always")
-
-#**updated file for kids********** ##########
-## additional variables
-# other vars: shteta
-table(kid_dhs_int$shteta, useNA = "always")
-
-kid_dhs_int <- kid_dhs_int %>% mutate(
-  shtetaindasno = case_when(
-    shteta=="0" ~ 0,
-    shteta=="1" ~ 1,
-    shteta=="3" ~ 0),
-  shtetaindasyes = case_when(
-    shteta=="0" ~ 0,
-    shteta=="1" ~ 1,
-    shteta=="3" ~ 1))
-
-#kid_hbv_kr_dis from other R files------------
+# Jan 2024: go through 01_datacleaning_rev.R) to obtain elig_kids_whbvres
 # make survey design object
-designf <-svydesign(ids=kid_hbv_kr_dis$hv001, strata=kid_hbv_kr_dis$hv022 , weights=kid_hbv_kr_dis$hh_weight,  data=kid_hbv_kr_dis)
+# weight variable decisions: hh_weight (frmo hv005), hv028_div, both_wt_new (hv005 + propens score), both_wt_old (hv028 + propens score)
+designf <-svydesign(ids=elig_kids_whbvres_kr$hv001, strata=elig_kids_whbvres_kr$hv022 , weights=elig_kids_whbvres_kr$both_wt_new,  data=elig_kids_whbvres_kr)
 options(survey.lonely.psu="adjust")
 designf_dhs2 <-as_survey_design(designf)
 
 # which HBV outcome var: main analysis is hbvresult5, hbvresultlow5, hbvresultlowpos5
 # sensitivity analyses: 1, 2, 100
 
-# basic stats
-# overall weighted hbv prevalence among children with results
-prop.table(svytable(~hbvresult5, designf_dhs2))
-svyciprop(~hbvresult5, designf_dhs2, method="lo")
-
-# antibodies: shroug, shorei, shrube
-svytotal(~shroug, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-svytotal(~shorei, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-svytotal(~shrube, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-
-svyby(~shroug,~shorei, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-svyby(~shroug,~shrube, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-svyby(~shorei,~shrube, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
-
-class(kid_dhs_int$shrube)
-class(kid_dhs_int$shroug)
-class(kid_dhs_int$shorei)
-table(kid_dhs_int$shorei)
-table(Mumps=kid_hbv_kr_dis$shorei, Rubella=kid_hbv_kr_dis$shrube, Measles=kid_hbv_kr_dis$shroug,useNA = "always")
-kid_hbv_kr_dis %>% count(shroug,shorei,shrube)
-
-# create functions to calculate weighted n
+# create functions to calculate weighted n------------
 # running functions pastes the results to clipboard which you can then copy into excel
 
 # counts for all n in dataset
@@ -195,19 +124,20 @@ survmean <- function(var){
 }
 
 # get results for vars of interest
-survtable_all("catresult5") # overall n
+survtable_all("hbvresult5") # overall n
 # unweighted for comparison
-table(kid_hbv_kr_dis$catresult5, useNA = "always")
+table(elig_kids_whbvres_kr$hbvresult5, useNA = "always")
 
-# continuous data: hhmem_n (number of household members), agenum (age)
-survmean_all("agenum")
-survmean("agenum")
+# continuous data: hhmem_n (number of household members), hv105_fromhc1 (age in years from months var)
+survmean_all("hv105_fromhc1")
+survmean("hv105_fromhc1")
 
-survmean_all("hhmem_n") 
-survmean("hhmem_n")
+survmean_all("hv009") 
+survmean("hv009")
 
 # categorical data
-catvars <- c("catresult5","catresult1", "catresult2", "catresult100","totalkidpos_f","hv104", "hv024", "hv025","hv026","hv270", "pfldh_kids","shtetaindasno","shtetaindasyes","prov2015") 
+catvars <- c("hbvresult5","hbvresult1", "hbvresult2", "hbvresult100","hv104", "hv024", "hv025","hv026","hv270", "pfldh_kids","shtetaindasno","shtetaindasyes","prov2015") 
+# need to make: "totalkidpos_f" 
 # resuming weighted counts "hv025","hv270","pfldh_kids", hv105 (1-year age)
 
 # Age
