@@ -2,6 +2,19 @@
 options(scipen = 999)
 options(scipen = 0)
 options(scipen = 100, digits = 3)
+
+# code to separate var names from values
+m <- glm(total ~  SE + source, data = df3)
+
+(trm <- attr(m$terms, "term.labels")) # Getting original variables
+
+(asgn <- attr(model.matrix(m$formula, data = df3), "assign")) # See ?model.matrix
+summary(m)
+
+cbind(Term = trm[asgn[-1]], 
+      Category = str_replace(names(coef(m)[-1]), trm[asgn[-1]], ""))
+#      Term    Category
+
 # kids---------------------
 # add weight variable
 kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
