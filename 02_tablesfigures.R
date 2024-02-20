@@ -86,17 +86,24 @@ table(kid_dhs_int$sh310a)
 table(kid_dhs_int$catresult)
 
 #JAN2024------------
+table(elig_kids_whbvres_wt_kr$v480, elig_kids_whbvres_wt_kr$prov2015)
 #Weighted children------------------------
 # add weight variable
 # kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
 # elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate_at(c('poskids'), as.factor)
+# elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate_at(c('v480'), as.factor)
 
-# Jan 2024: go through 01_datacleaning_rev.R) to obtain elig_kids_whbvres_wt_kr
+# go through 01_datacleaning_rev.R) to obtain elig_kids_whbvres_wt_kr
 # make survey design object
 # weight variable decisions: hh_weight (frmo hv005), hv028_div, both_wt_new (hv005 + propens score), both_wt_old (hv028 + propens score)
 designf <-svydesign(ids=elig_kids_whbvres_wt_kr$hv001, strata=elig_kids_whbvres_wt_kr$hv022 , weights=elig_kids_whbvres_wt_kr$both_wt_new,  data=elig_kids_whbvres_wt_kr)
 options(survey.lonely.psu="adjust")
 designf_dhs2 <-as_survey_design(designf)
+
+# survey design for households
+designhh <-svydesign(ids=elig_kids_whbvres_wt_kr$cluster_hh, strata=elig_kids_whbvres_wt_kr$hv022 , weights=elig_kids_whbvres_wt_kr$hv028_div,  data=elig_kids_whbvres_wt_kr)
+designhh2 <-as_survey_design(designhh)
+svymean(~hv009,designhh2, na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
 
 # which HBV outcome var: main analysis is hbvresult5, hbvresultlow5, hbvresultlowpos5
 # sensitivity analyses: 1, 2, 100
@@ -193,14 +200,80 @@ tetorig <- as.data.frame(survtable_all("tetab")) %>% rownames_to_column(var = "c
 # number of kids positive 
 poskids <- as.data.frame(survtable_all("poskids")) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "poskids", 2)[,2], cov = "poskids") 
+anem <- as.data.frame(survtable_all("anemia_f")) %>% rownames_to_column(var = "covname") %>% 
+  mutate(levels = str_split_fixed(covname, "anemia_f", 2)[,2], cov = "anemia_f") 
+modstu <- as.data.frame(survtable_all("modstunt_f")) %>% rownames_to_column(var = "covname") %>% 
+  mutate(levels = str_split_fixed(covname, "modstunt_f", 2)[,2], cov = "modstunt_f") 
+dpt_dos <- as.data.frame(survtable_all("dpt_doses_f")) %>% rownames_to_column(var = "covname") %>% 
+  mutate(levels = str_split_fixed(covname, "dpt_doses_f", 2)[,2], cov = "dpt_doses_f") 
+inje <- as.data.frame(survtable_all("injec_f")) %>% rownames_to_column(var = "covname") %>% 
+  mutate(levels = str_split_fixed(covname, "injec_f", 2)[,2], cov = "injec_f") 
+beat <- as.data.frame(survtable_all("beat_f")) %>% rownames_to_column(var = "covname") %>% 
+  mutate(levels = str_split_fixed(covname, "beat_f", 2)[,2], cov = "beat_f") 
+reused <- as.data.frame(survtable_all("v480")) %>% rownames_to_column(var = "covname") %>% 
+  mutate(levels = str_split_fixed(covname, "v480", 2)[,2], cov = "v480") 
+view(reused)
+reused <- reused %>% group_by(cov) %>% mutate(totperc = 100*(total / sum(total)))  %>% ungroup()
 
-all_tot <- dplyr::bind_rows(list(age, sex, relhh, urbrur, location, prov, wealth, pfmal, tetorig, poskids), .id = 'source') #tetlower, tetupper,
+
+all_tot <- dplyr::bind_rows(list(age, sex, relhh, urbrur, location, prov, wealth, pfmal, tetorig, poskids, anem, modstu, dpt_dos, inje, beat), .id = 'source') #tetlower, tetupper,
 all_tot <- all_tot %>% filter(total>0) %>% select(-SE)
 all_tot <- all_tot %>% group_by(source) %>% mutate(totperc = 100*(total / sum(total)))  %>% ungroup()
+view(all_tot)
+
+## hbv n, by counts------
+tothbv <- survtable_all("hbvresult5") 
+tothbv <- as.data.frame(tothbv) %>% rownames_to_column(var = "covname") %>% rename(hbv_pos = total) %>% select(-hbvresult5)
+tothbvneg <- as.data.frame(tab1 %>% group_by(source) %>% summarise(totneg = sum(hbv_neg))) %>% summarise(hbv_neg = median(totneg))
+tot_by <- cbind(tothbv,tothbvneg)
+
+## hbv n, overall------
+tot_by$total <- tot_by$hbv_pos + tot_by$hbv_neg 
+totn <- tot_by %>% select(-c("hbv_neg", "hbv_pos"))
+totn$source <- "0"
+totn$totperc <- NA_real_
+totn$levels <- "HBsAg-positive"
+totn$cov <- totn$covname
+
+## hbv n onto total df------
+all_tot <- dplyr::bind_rows(list(totn, all_tot))
+view(tab1_simp)
+
+## Simplify Tab1
+tab1 <- all_tot %>% mutate_if(is.numeric, round, 0) %>% mutate(Tab1tot = paste(total,' (',totperc,')',  sep = ""))
+tab1_simp <- tab1 %>% select(c("covname", "levels", "Tab1tot"))
+
+# Export simplified Table 1------
+write.csv(tab1_simp, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/K manuscript/tab1_feb24.csv")
 
 ## cat data, by hbv----------
+svyciprop(~hbvresult5, designf_dhs2, method = "me",na.rm=T, survey.lonely.psu="adjust")
+
+age_by <- as.data.frame(svyby(~hbvresult5,~hv105_fromhc1_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("hv105_fromhc1_f"))
+sex_by <- as.data.frame(svyby(~hbvresult5,~sex, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("sex"))
+reltoheadhh_by <- as.data.frame(svyby(~hbvresult5,~reltoheadhh_simp, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("reltoheadhh_simp"))
+urbru_by <- as.data.frame(svyby(~hbvresult5,~urbanrural, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("urbanrural"))
+location_by <- as.data.frame(svyby(~hbvresult5,~location, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("location"))
+prov2015_by <- as.data.frame(svyby(~hbvresult5,~prov2015, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("prov2015"))
+wealth_by <- as.data.frame(svyby(~hbvresult5,~wealth, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("wealth"))
+pfmal_by <- as.data.frame(svyby(~hbvresult5,~pfmalaria, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("pfmalaria"))
+shteta_by <- as.data.frame(svyby(~hbvresult5,~tetab, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("tetab"))
+anem_by <- as.data.frame(svyby(~hbvresult5,~anemia_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("anemia_f"))
+modstu_by <- as.data.frame(svyby(~hbvresult5,~modstunt_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("modstunt_f"))
+dpt_dos_by <- as.data.frame(svyby(~hbvresult5,~dpt_doses_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("dpt_doses_f"))
+inje_by <- as.data.frame(svyby(~hbvresult5,~injec_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("injec_f"))
+beat_by <- as.data.frame(svyby(~hbvresult5,~beat_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("beat_f"))
+view(prov2015_by)
+# combine
+all_by <- dplyr::bind_rows(list(age_by, sex_by, reltoheadhh_by, urbru_by, location_by, prov2015_by, wealth_by, pfmal_by, shteta_by, anem_by, modstu_by,dpt_dos_by, inje_by, beat_by)) %>% 
+  filter(!grepl("se\\.", covname) & !grepl("hbvresult5", covname))
+write.csv(all_by, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/K manuscript/tab2_prevcis.csv")
+
+# =anemia
+svyby(~hbvresult5,~anemia_f, designf_dhs2, svytotal,method = "me",na.rm=T, survey.lonely.psu="adjust")
+
 # covariates by hbv status
-age_by <- as.data.frame(t(as.data.frame(survtable("hv105_fromhc1_f")))) %>% rownames_to_column(var = "covname")
+age_by <- as.data.frame(t(as.data.frame(survtable("hv105_fromhc1_f")))) %>% rownames_to_column(var = "covname") #%>% select(-one_of("hv105_fromhc1_f"))
 sex_by <-  as.data.frame(t(as.data.frame(survtable("sex")))) %>% rownames_to_column(var = "covname")
 reltoheadhh_by <-  as.data.frame(t(as.data.frame(survtable("reltoheadhh_simp")))) %>% rownames_to_column(var = "covname")
 urbru_by <-  as.data.frame(t(as.data.frame(survtable("urbanrural")))) %>% rownames_to_column(var = "covname")
@@ -209,85 +282,79 @@ prov2015_by <-  as.data.frame(t(as.data.frame(survtable("prov2015")))) %>% rowna
 wealth_by <-  as.data.frame(t(as.data.frame(survtable("wealth")))) %>% rownames_to_column(var = "covname")
 pfmal_by <-  as.data.frame(t(as.data.frame(survtable("pfmalaria")))) %>% rownames_to_column(var = "covname")
 shteta_by <-  as.data.frame(t(as.data.frame(survtable("tetab")))) %>% rownames_to_column(var = "covname")
-#shtetaindasno_by <-  as.data.frame(t(as.data.frame(survtable("shtetaindasno")))) %>% rownames_to_column(var = "covname")
-#shtetaindasyes_by <-  as.data.frame(t(as.data.frame(survtable("shtetaindasyes")))) %>% rownames_to_column(var = "covname")
+anem_by <-  as.data.frame(t(as.data.frame(survtable("anemia_f")))) %>% rownames_to_column(var = "covname")
+modstu_by <-  as.data.frame(t(as.data.frame(survtable("modstunt_f")))) %>% rownames_to_column(var = "covname")
+dpt_dos_by <-  as.data.frame(t(as.data.frame(survtable("dpt_doses_f")))) %>% rownames_to_column(var = "covname")
+inje_by <-  as.data.frame(t(as.data.frame(survtable("injec_f")))) %>% rownames_to_column(var = "covname")
+beat_by <-  as.data.frame(t(as.data.frame(survtable("beat_f")))) %>% rownames_to_column(var = "covname")
+view(anem_by)
+svyby(~pfmalaria,~hbvresult5, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
 
 # survtable("poskids") # since there are 0 counts by design, need to run outside the function
-poskids_by <- as.data.frame(t(as.data.frame(svyby(~poskids,~hbvresult5, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")))) %>% rownames_to_column(var = "covname")
+poskids_by <- as.data.frame(svyby(~hbvresult5,~poskids, designf_dhs2, svyciprop, na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("poskids"))
+view(poskids_by)
 
 ## combine cat data----------
-all_by <- dplyr::bind_rows(list(age_by, sex_by, reltoheadhh_by, urbru_by, location_by, prov2015_by, wealth_by, pfmal_by, shteta_by, poskids_by)) %>% 
-  filter(!grepl("se.", covname) & !grepl("hbvresult5", covname))
+all_by <- dplyr::bind_rows(list(age_by, sex_by, reltoheadhh_by, urbru_by, location_by, prov2015_by, wealth_by, pfmal_by, shteta_by, anem_by, modstu_by,dpt_dos_by, inje_by, beat_by)) %>% 
+  filter(!grepl("se\\.", covname) & !grepl("hbvresult5", covname))
+view(all_by)
 colnames(all_by)[2] <- "hbv_neg"
 colnames(all_by)[3] <- "hbv_pos"
 
-all_by <- all_by %>% filter(hbv_neg>0 | hbv_pos>0)
-view(all_by)
+all_ci <- all_by %>% filter(!is.na(hbvresult5)) %>% select(-c("hbv_pos", "hbv_neg")) %>% 
+  mutate(prev100 = round(hbvresult5*100, 1),
+         ci_l100 = round(ci_l*100, 1),
+         ci_u100 = round(ci_u*100, 1),
+         Tab2prevci = paste(prev100,' (',ci_l100,', ', ci_u100,')', sep = ""))
 
-## hbv n, by counts------
-tothbv <- survtable_all("hbvresult5") 
-tothbv <- as.data.frame(tothbv) %>% rownames_to_column(var = "covname") %>% rename(hbv_pos = total) %>% select(-hbvresult5)
-tothbvneg <- as.data.frame(tab1 %>% group_by(source) %>% summarise(totneg = sum(hbv_neg))) %>% summarise(hbv_neg = median(totneg))
-tot_by <- cbind(tothbv,tothbvneg)
-view(tot_by)
+all_ci_s <- all_ci %>% select(c("covname", "Tab2prevci"))
+
+write.csv(all_ci_s, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/K manuscript/tab2prcis.csv")
+
+# all_by <- all_by %>% filter(hbv_neg>0 | hbv_pos>0)
+
 ## hbv n onto by df-----
 all_by <- dplyr::bind_rows(list(tot_by, all_by))
 
-## hbv n, overall------
-totn$total <- totn$hbv_pos + totn$hbv_neg 
-totn <- totn %>% select(-c("hbv_neg", "hbv_pos"))
-totn$source <- "0"
-totn$totperc <- NA_real_
-totn$levels <- "HBsAg-positive"
-totn$cov <- totn$covname
+## Tab2 merg totals and bys-----
+tab2 <- left_join(all_by, all_tot, by = c("covname"))
+view(tab2)
+###col percent
+### tab1 <- tab1 %>% group_by(source) %>% mutate(hbv_pos_perc = 100*(hbv_pos/sum(hbv_pos)), hbv_neg_perc = 100*(hbv_neg/sum(hbv_neg))) %>% ungroup()
+colnames(tab2)
+# row percent - to report in table 2 (prevalence)
+tab2_simp <- tab2 %>% mutate(hbv_prev = 100*(hbv_pos/total))  %>% select(c(source,cov, levels, hbv_pos, total, hbv_prev)) %>% mutate_if(is.numeric, round, 1) # or round to 1
+view(tab2_simp)
 
-## hbv n onto total df------
-all_tot <- dplyr::bind_rows(list(totn, all_tot))
+# Export Table 2------
+write.csv(tab2_simp, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/K manuscript/tab2_feb24.csv")
 
-## Tab1 merg totals and bys-----
-tab1 <- left_join(all_by, all_tot, by = c("covname"))
-tab1 <- tab1 %>% group_by(source) %>% mutate(hbv_pos_perc = 100*(hbv_pos/sum(hbv_pos)), hbv_neg_perc = 100*(hbv_neg/sum(hbv_neg))) %>% ungroup()
-tab1 <- tab1 %>% relocate(source, covname, cov, levels, hbv_pos,hbv_pos_perc, hbv_neg, hbv_neg_perc, total, totperc)
-tab1 <- tab1 %>% mutate_if(is.numeric, round, 0)
+##combine counts and CI est----
+options(scipen = n)
+# this merge works but could break
+tab2_comb <- cbind(tab2_simp[tab2_simp$cov!="hbvresult5",], all_by)
+#--- correct way to merge, but ignoring for now---
+all_by2 <- all_by %>% rename(levels = covname)
+tab2_comb <- merge(tab2_simp[tab2_simp$cov!="hbvresult5",], all_by2[], by = "levels")
+#---
 
-tab1 <- tab1 %>% mutate(Tab1hbvpos = paste(hbv_pos,' (',hbv_pos_perc,')', sep = ""),
-                        Tab1hbvneg = paste(hbv_neg,' (',hbv_neg_perc,')', sep = ""),
-                        Tab1tot = paste(total,' (',totperc,')',  sep = ""))
-## Simplify Tab1
-tab1_simp <- tab1 %>% select(c("cov", "levels", "Tab1hbvpos","Tab1hbvneg","Tab1tot" ))
-# Merge num/cat--------
-tab1_simp_pt1 <- bind_rows(Tab1_num, tab1_simp)
-view(tab1_simp_pt1)
+tab2_comb2 <- tab2_comb %>% mutate(hbv_prev_check = 100*hbvresult5,
+                                  ci_l_perc = 100*ci_l,
+                                  ci_u_perc = 100*ci_u) %>% 
+                          mutate_if(is.numeric, round, 1) %>% 
+                          select(c(source,cov, levels, hbv_pos, total, hbv_prev,hbv_prev_check,ci_l_perc,ci_u_perc)) %>% 
+  filter(cov != "poskids")
+tab2_comb3 <- tab2_comb2 %>% mutate(Tab2prevci = paste(hbv_prev,' (',ci_l_perc,', ', ci_u_perc,')', sep = "")) %>% select(source,cov, levels, hbv_pos, total, Tab2prevci)
+write.csv(tab2_comb3, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/K manuscript/tab2comp_feb24.csv")
 
-# Export Table 1------
-#NEXT STEPS JAN 29: add additional columns below--------
-write.csv(tab1_simp_pt1, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/K manuscript/tab1.csv")
+view(tab2_comb3)
 
-# nutritional status: sevstunt, modstunt, stunt,sevwasting, modwasting, wasting, underweight
-# hc57 (anemia): 1- severe; 2-moderate; 3 -mild; 4- not anemic; NaN - missing
-# anemia: 1- not anemic; 2-mild; 3 -moderate; 4- severe; NaN - missing
 
-survtable_all("anemia") # anemia
-survtable("anemia")
-# stunting: 0-no stunt; 1-moderate; 2-severe; 9-missing
-survtable_all("stunt") 
-survtable("stunt")
-# wasting: 0-no stunt; 1-moderate; 2-severe; 9-missing
-survtable_all("wasting") 
-survtable("wasting")
-# underweight
-survtable_all("underweight") 
-survtable("underweight")
 
-kid_hbv_kr_dis$pfldh <- as.numeric(kid_hbv_kr_dis$pfldh)
-# prevalence by sex (rather than division of sex by positives and negatives), with CI
-svyby(~hbvresult5,~hv104, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
-svyby(~hbvresult5,~hv105, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
-svyby(~hbvresult5,~pfldh, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
-svyby(~pfldh,~hbvresult5, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
-class(kid_hbv_kr_dis$pfldh)
-table(kid_hbv_kr_dis$pfldh_kids)
-table(kid_hbv_kr_dis$pfldh)
+
+
+
+
 ##Anthro diff denom------------
 # anemia
 table(kid_hbv_kr_dis$hc57,kid_hbv_kr_dis$stunt, useNA = "always" )
@@ -297,34 +364,6 @@ designf_a <-svydesign(ids=anthro_kid_hbv_kr_dis$hv001, strata=anthro_kid_hbv_kr_
 designf_dhs2a <-as_survey_design(designf_a)
 # stunting with different denom
 svyby(~hc57,~hbvresult5, designf_dhs2a, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-
-
-anthro_kid_hbv_kr_dis <- kid_hbv_kr_dis %>% filter(!is.na(stunt))
-# make survey design object
-library(srvyr)
-library(survey)
-designf_a <-svydesign(ids=anthro_kid_hbv_kr_dis$hv001, strata=anthro_kid_hbv_kr_dis$hv022 , weights=anthro_kid_hbv_kr_dis$hh_weight,  data=anthro_kid_hbv_kr_dis)
-options(survey.lonely.psu="adjust")
-designf_dhs2a <-as_survey_design(designf_a)
-# stunting with different denom
-svyby(~stunt,~hbvresult5, designf_dhs2a, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-
-# wasting
-anthro_kid_hbv_kr_dis <- kid_hbv_kr_dis %>% filter(!is.na(wasting))
-# make survey design object
-designf_a <-svydesign(ids=anthro_kid_hbv_kr_dis$hv001, strata=anthro_kid_hbv_kr_dis$hv022 , weights=anthro_kid_hbv_kr_dis$hh_weight,  data=anthro_kid_hbv_kr_dis)
-designf_dhs2a <-as_survey_design(designf_a)
-# stunting with different denom
-svyby(~wasting,~hbvresult5, designf_dhs2a, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-
-# underweight
-anthro_kid_hbv_kr_dis <- kid_hbv_kr_dis %>% filter(!is.nan(underweight))
-# make survey design object
-designf_a <-svydesign(ids=anthro_kid_hbv_kr_dis$hv001, strata=anthro_kid_hbv_kr_dis$hv022 , weights=anthro_kid_hbv_kr_dis$hh_weight,  data=anthro_kid_hbv_kr_dis)
-designf_dhs2a <-as_survey_design(designf_a)
-# stunting with different denom
-svyby(~underweight,~hbvresult5, designf_dhs2a, svytotal, na.rm=T, survey.lonely.psu="adjust") %>% clipr::write_clip()
-
 
 
 # misc checks
@@ -729,6 +768,7 @@ hhsum_all_sf$hhprev_samp
 view(drcprov) # adm1_viz is prov label - need to append 0/1 of whether province had exposed households (kid positive) or no
 view(hhsum_all_sf)
 library(readxl)
+library(sf)
 provlabels <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx",
                          sheet = "provlabels")
 drcprov <- left_join(drcprov, provlabels, by = "ADM1_VIZ_N")
