@@ -73,6 +73,7 @@ cc_kids1 <- elig_kids_2_whbvres %>% filter(!is.na(ccstat1fin))
 cc_kids2 <- elig_kids_2_whbvres %>% filter(!is.na(ccstat2fin))
 cc_kids100 <- elig_kids_2_whbvres %>% filter(!is.na(ccstat100fin))
 
+nrow(hhmemb5)
 # find correct dataset of adults
 view(adults4mrg) # `both` contains kids and adult results
 hhmemb5 <- dhsmeta %>% filter(cluster_hh %in% cc_kids5$cluster_hh) %>%  
@@ -103,7 +104,8 @@ adults4mrg$hbv_adcorr <- adults4mrg$hbv - 1
 
 hhmemb5 %>% filter(eligtesting==1 & consent_add==1) %>% group_by()
 hhmemb5 <- left_join(hhmemb5,adults4mrg[,c("dbsbarcode", "hbv_adcorr", "clus_hh_ind")], by = "dbsbarcode")
-table(hhmemb5$hbv_adcorr, useNA = "always")
+
+table(adultstat = hhmemb5$hbv_adcorr,casecontrol =hhmemb5$ccstat5fin, useNA = "always")
 
 #sum pos counts at hh level
 ad_sum_clusthh <- 
@@ -116,7 +118,7 @@ table(poscount = ad_sum_clusthh$prev5_adtested)
 hhmemb5 <- left_join(hhmemb5, ad_sum_clusthh, by = "cluster_hh")
 # counts by case/control
 hhmemb5 <- left_join(hhmemb5, kids_hh[, c("cluster_hh", "n_poskids5","ccstat5fin" )], by = "cluster_hh")
-table(test$ccstat5fin, useNA = "always")
+table(hhmemb5$ccstat5fin, useNA = "always")
 
 table(ccstat = hhmemb5$ccstat5fin,hhmemb5$hbv_adcorr, useNA = "always" )
 # still seeing 8% prevalence among control households
@@ -128,8 +130,22 @@ table(hhmemb5$n_posad5, hhmemb5$ccstat5fin)
 # hh member status onto kids df
 test <- left_join(elig_kids_2_whbvres, ad_sum_clusthh[, c("cluster_hh", "n_posad5","n_ad_tested" )], by = "cluster_hh")
 test %>% group_by(ccstat5fin, n_posad5) %>% count()
+test <- test %>% mutate(exposed = case_when(n_posad5 >0 ~ 1,
+                                            n_posad5==0 ~ 0))
 # get 2x2 table from this
+nrow(test)
+designf_cc <-svydesign(ids=test$hv001, strata=test$hv022 , weights=test$both_wt_new,  data=test)
+options(survey.lonely.psu="adjust")
+designf_dhs2cc <-as_survey_design(designf_cc)
 
+table(exp = test$n_posad5, outcome = test$hbvresult5)
+table(exp = test$exposed, outcome = test$hbvresult5)
+as.data.frame(svyby(~hbvresult5,~n_posad5, designf_dhs2cc, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("wealth"))
+as.data.frame(svyby(~hbvresult5,~exposed, designf_dhs2cc, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("wealth"))
 
+svyby(~as.factor(exposed),~hbvresult5 , designf_dhs2cc, svytotal,na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
 
-
+ad_hbs <- svyglm(hbvresult5~as.factor(exposed), designf_dhs2cc, family=quasibinomial("logit"))
+summary(ad_hbs)
+exp(ad_hbs$coefficients)
+exp(confint(ad_hbs))
