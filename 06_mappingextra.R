@@ -2,27 +2,22 @@
 library(tidyverse)
 library(sf)
 library(colorspace)
-
-# for clusters with missing GPS but province given, impute GPS
-kid_hbv_kr_dis <- kid_hbv_kr_dis %>% 
-  dplyr::mutate(prov2015=factor(
-    kid_hbv_kr_dis$shnprovin, 
-    levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26),
-    labels = c("Kinshasa", "Kwango","Kwilu","Mai-Ndombe","Kongo Central","Equateur","Mongala","Nord-Ubangi","Sud-Ubangi","Tshuapa","Kasai","Kasai-Central","Kasai-Oriental","Lomami","Sankuru","Haut-Katanga","Haut-Lomami","Lualaba","Tanganyka","Maniema","Nord-Kivu","Bas-Uele","Haut-Uele","Ituri","Tshopo","Sud-Kivu")))
+library(gstat)
+library(stars)
+library(tidyverse)
+library(patchwork)
+library(sp)
+library(viridis)
+# TO USE from 01_datacleaning_revR: elig_kids_whbvres_wt_kr
 # should be using cluster number to impute, not cluster/hh!!!
 
-#originally using summary list of households, but maybe this isn't complete
-gpsmiss <- hhsum_all %>% filter(latnum=="0" | is.na(latnum)) %>% select(hv001, prov2015, hv026,latnum, longnum) %>% rename(prov_name = prov2015) %>% distinct(hv001, .keep_all=T)
-view(gpsmiss)
+
 # n=28 clusters with missing when using this - concerning about hhsum_all?
-gpsmiss <- kid_hbv_kr_dis %>% filter(latnum=="0"| is.na(latnum)) %>% select(hv001, prov2015, hv026,latnum, longnum) %>% rename(prov_name = prov2015) %>% distinct(hv001, .keep_all=T)
+gpsmiss <- elig_kids_whbvres_wt_kr %>% filter(latnum=="0"| is.na(latnum)) %>% select(hv001, prov2015, hv026,latnum, longnum) %>% rename(prov_name = prov2015) %>% distinct(hv001, .keep_all=T)
 nrow(gpsmiss)
 # n=46 clusters with missing
 # count missing by cluster
 gpsmiss %>% group_by(prov_name) %>% summarise(n=n())
-
-# check hh hbv prev by clusters with missing gps - how differential (and is hhsum_all the correct one to use)
-hhsum_all %>% filter(latnum==0) %>% group_by(prov2015) %>% summarise(mean(hhprev_samp))
 
 # view counts by province 
 ctsamp <- gpsmiss %>% group_by(prov_name) %>% count()
@@ -30,14 +25,14 @@ view(ctsamp)
 # hv026 Place of residence, 0  Capital, large city, 1  Small city, 2  Town, 3  Countryside
 write.csv(gpsmiss, file = "/Users/camillem/Documents/GitHub/dhs_hbv/Data/gpsmiss_impute.csv")
 
-gpsmiss <- left_join(gpsmiss, drcprov[, c("prov_name", "geometry")], by = "prov_name")
-view(gpsmiss)
+gpsmiss2 <- left_join(gpsmiss, drcprov[, c("prov_name", "geometry")], by = "prov_name")
+view(gpsmiss2)
 
 #Impute GPS in prov bounds---------------- 
 # set seed
 set.seed(10272023)
 sf_use_s2(F)
-points <- st_sample(gpsmiss$geometry, size = c(1,1), type = "random") #, by_polygon = T ; type=random
+points <- st_sample(gpsmiss2$geometry, size = c(1,1), type = "random") #, by_polygon = T ; type=random
 p1_sf = st_sf(points)
 
 p1_joined = st_join(p1_sf, drcprov)
@@ -52,11 +47,12 @@ gpsmiss_imp <- gpsmiss_imp %>%
 
 # map imputed points
 ggplot() + 
-  geom_sf(data=drcprov, aes(fill=as.factor(hasexphh)), color="tan4", size=0.5) + 
+  geom_sf(data=drcprov, color="tan4", size=0.5) + 
   geom_sf(data=points) 
 
 gpsmiss_imp$hv001 <- as.numeric(gpsmiss_imp$hv001)
-kidsmap_imp <- left_join(kid_hbv_kr_dis[, c("hv001","cluster_hh","kids_barcode","prov2015","hbvresult5", "hbvresult1","hbvresult2","hbvresult100","shteta","shtetaindasno", "shtetaindasyes","geometry", "latnum", "longnum", "hv105", "hv104")], gpsmiss_imp[, c("hv001","lat_imp","lon_imp","imputed")], by = "hv001" )
+elig_kids_whbvres_wt_kr$hv001 <- as.numeric(elig_kids_whbvres_wt_kr$hv001)
+kidsmap_imp <- left_join(elig_kids_whbvres_wt_kr[, c("hv001","cluster_hh","kids_barcode","prov2015","hbvresult5", "hbvresult1","hbvresult2","hbvresult100","dpt_count","tetab","shteta","shtetaindasno", "shtetaindasyes","geometry", "latnum", "longnum", "hv105_fromhc1_f", "sex")], gpsmiss_imp[, c("hv001","lat_imp","lon_imp","imputed")], by = "hv001" )
 
 kidsmap_imp$lat_rev <- ifelse(kidsmap_imp$latnum=="0" | is.na(kidsmap_imp$latnum), kidsmap_imp$lat_imp, kidsmap_imp$latnum)
 kidsmap_imp$long_rev <- ifelse(kidsmap_imp$longnum=="0"| is.na(kidsmap_imp$latnum), kidsmap_imp$lon_imp, kidsmap_imp$longnum)
@@ -67,7 +63,7 @@ kidsmap_imp <- kidsmap_imp %>% select(-c(geometry.x,geometry.y))
 kidsmap_imp %>% filter(is.na(lat_rev)) %>% count()
 
 kidsmap_impsf <- st_as_sf(kidsmap_imp[!is.na(kidsmap_imp$lat_rev) &!is.na(kidsmap_imp$long_rev),], coords = c("long_rev", "lat_rev"), crs = 4326) 
-view(kidsmap_impsf)
+
 
 # none - all missing gps addressed
 test2 <- kidsmap_imp %>% filter(is.na(lat_rev)) 
@@ -77,37 +73,79 @@ test3 <- test2 %>% group_by(hv001,prov2015) %>% summarise(n=n())
 view(test3)
 
 # Main maps-------------------------------
-library(sf)
-library(gstat)
-library(stars)
-library(tidyverse)
-library(patchwork)
-library(sp)
+# number of distinct households per cluster and number of kids per cluster
+test <- elig_kids_whbvres_wt_kr %>% group_by(hv001) %>% summarize(nhh = n_distinct(hv002), nkids = n())
+view(test)
 
 dhsmeta <- readRDS("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/DHS_pr_full_merge_backup.rds")
 
 dhsmeta_kids <- dhsmeta %>% filter(kids==1)
 
-# redo sf geometry
-kidmapsf = st_as_sf(kid_hbv_kr_dis[!is.na(kid_hbv_kr_dis$latnum) &!is.na(kid_hbv_kr_dis$longnum),], coords = c("longnum", "latnum"), crs = 4326) 
-# evaluate the 6997-6973 that didn't map
-head(kidmapsf$geometry)
-nogpskid <- kid_dhs_int %>% filter(!(cluster_hh %in% kidmapsf$cluster_hh)) %>% select(c("cluster_hh","latnum", "longnum","shnprovin","adm1fips","adm1name","catresult" ))
-
 # from 06_mappingextra.R, use kidsmap_impsf, which has imputed GPS
-sf_use_s2(F)
+sf_use_s2(T)
 
+
+summary(output_df$n)
 # subset cluster level df to get weights
-output_df <- kid_hbv_kr_dis %>% 
+output_df <- kidsmap_impsf %>% 
   group_by(hv001) %>%
   dplyr::summarize(n=n(),
-                   #npos5 = n(hbvresult5),
+                   imputed = mean(imputed),
                    prev = mean(hbvresult5, na.rm=T)*100,
                    prev1 = mean(hbvresult1, na.rm=T)*100,
                    prev2 = mean(hbvresult2, na.rm=T)*100,
-                   prev100 = mean(hbvresult100, na.rm=T)*100)
+                   prev100 = mean(hbvresult100, na.rm=T)*100,
+                   avg_pentdos = mean(dpt_count),
+                   tetreact = mean(tetab=="1")) %>% 
+  mutate(prev_grp = case_when(
+            prev == 0 ~ 0,
+            prev > 0 & prev<= 5.5 ~ 1,
+            prev > 5.5 & prev<= 10.49 ~ 2,
+            prev > 10.49 & prev<= 15.49 ~ 3,
+            prev > 15.49  ~ 4),
+          prev_grp_f = factor(prev_grp,
+            levels = c(0,1,2,3,4),
+            labels = c("0%", ">0-5%", ">5-10%", ">10-15%",">15%")),
+          prev1_grp = case_when(
+            prev1 == 0 ~ 0,
+            prev1 > 0 & prev1<= 5.5 ~ 1,
+            prev1 > 5.5 & prev1<= 10.49 ~ 2,
+            prev1 > 10.49 & prev1<= 15.49 ~ 3,
+            prev1 > 15.49  ~ 4),
+          prev1_grp_f = factor(prev1_grp,
+            levels = c(0,1,2,3,4),
+            labels = c("0%", ">0-5%", ">5-10%", ">10-15%",">15%")),
+          prev2_grp = case_when(
+            prev2 == 0 ~ 0,
+            prev2 > 0 & prev2<= 5.5 ~ 1,
+            prev2 > 5.5 & prev2<= 10.49 ~ 2,
+            prev2 > 10.49 & prev2<= 15.49 ~ 3,
+            prev2 > 15.49  ~ 4),
+          prev2_grp_f = factor(prev2_grp,
+            levels = c(0,1,2,3,4),
+            labels = c("0%", ">0-5%", ">5-10%", ">10-15%",">15%")),
+          prev100_grp = case_when(
+            prev100 == 0 ~ 0,
+             prev100 > 0 & prev100<= 5.5 ~ 1,
+             prev100 > 5.5 & prev100<= 10.49 ~ 2,
+             prev100 > 10.49 & prev100<= 15.49 ~ 3,
+             prev100 > 15.49  ~ 4),
+          prev100_grp_f = factor(prev100_grp,
+             levels = c(0,1,2,3,4),
+             labels = c("0%", ">0-5%", ">5-10%", ">10-15%",">15%")))
 
-output_df <- merge(output_df, kid_hbv_kr_dis[,c("hh_weight","hv001")],by="hv001", all.x = TRUE)
+# for subset with dpt reporting
+dpt <- kidsmap_impsf %>% filter(!is.na(dpt_count)) %>% 
+  group_by(hv001) %>%
+  dplyr::summarize(n=n(),
+                   imputed = mean(imputed),
+                   avg_pentdos = mean(dpt_count))
+# weights from main dataset
+# weights are different at the child, household, as well as cluster level
+# wts <- elig_kids_whbvres_wt_kr %>% group_by(hv001) %>% select(c("hv001","both_wt_new", "both_wt_old","iptw_s","hv028_div","hh_weight"))
+
+# output_df <- merge(output_df, elig_kids_whbvres_wt_kr[,c("hv001","both_wt_new", "both_wt_old","iptw_s","hv028_div","hh_weight")],by="hv001", all.x = TRUE)
+
 
 # GADM boundaries from: https://gadm.org/download_country_v3.html
 admin0 <- readRDS('/Users/camillem/Documents/GitHub/animalaria/admin0.rds') %>%          # GADM admin0 boundaries
@@ -118,42 +156,31 @@ st_crs(admin0) # view CRS
 
 DRC <- admin0 %>% filter(Country=='Democratic Republic of the Congo') # DRC
 
-summary(kidmapsf$hh_weight)
-
-table(kidmapsf$shteta)
-
-table(kidsmap_impsf$shteta)
-output <- kidsmap_impsf %>% 
-  group_by(hv001) %>%
-  dplyr::summarize(n=n(),
-                   imputed = mean(imputed),
-                   prev = mean(hbvresult5, na.rm=T)*100,
-                   prev1 = mean(hbvresult1, na.rm=T)*100,
-                   prev2 = mean(hbvresult2, na.rm=T)*100,
-                   prev100 = mean(hbvresult100, na.rm=T)*100,
-                   tetcovlower = mean(shtetaindasno, na.rm=T)*100,
-                   tetcovupper = mean(shtetaindasyes, na.rm=T)*100)
-table(output$imputed)
-output$tetdiff <- output$tetcovupper - output$tetcovlower
-
-
 # remove points where geometry is outside of DRC outline (geometry=c(0,0))
-output_points <- st_join(output, DRC, join = st_intersects) %>% filter(!is.na(Country))
+output_points <- st_join(output_df, DRC, join = st_intersects) %>% filter(!is.na(Country))
+dpt_points <- st_join(dpt, DRC, join = st_intersects) %>% filter(!is.na(Country))
 
 # simple map of dhs cluster locations with kid samples
 drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%   st_transform(4326)
+drccities = st_read("/Users/camillem/Documents/GitHub/dhs_hbv/Data/cod_cities_20180906h/COD_CITIES_20180906H.shp", stringsAsFactors = FALSE) %>% filter(estimate20 > 200000 & name != "Kananga") %>%   st_transform(4326) # Mbuji-Mayi too close to Kananga
+
+drcwat = st_read("/Users/camillem/Documents/GitHub/hbv_hover/COD_wat/COD_water_areas_dcw.shp", stringsAsFactors = FALSE)   %>% filter(HYC_DESCRI == "Perennial/Permanent" & NAME != "UNK") %>%  st_transform(4326) #%>% filter(NAME=="CONGO" | NAME == "LUALABA (CONGO)" | NAME == "OUBANGUI(UBANGI)")
+view(drcwat)
 
 ## DHS clust------------
-Z <-
+#Z <-
   ggplot() + 
   geom_sf(data=admin0, fill="snow3", color="snow4") +
   geom_sf(data=DRC, fill="snow2") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, alpha=0.8, aes(color=as.factor(imputed))) + 
+  geom_sf(data=output_points, alpha=0.8, aes(shape=as.factor(imputed), color=as.factor(imputed))) + 
   #labs(color='') + 
+  geom_sf(data=drcwat, color="steelblue")+
+  geom_sf(data=drccities, color = "black", shape = "18")+
+  geom_sf_text(data=drccities, aes(label = name))+
   theme_bw(base_size=14) + 
-  scale_color_manual(values = c("black","mediumpurple2"), labels = c("Original", "Imputed") ) + 
+  scale_color_manual(values = c("gray30","mediumpurple2"), labels = c("Original", "Imputed") ) + 
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   #ggtitle("Children ≤ 5")+ # for adding with adult figure
@@ -169,7 +196,14 @@ Z <-
 Z
 ggsave("./Plots/dhslocs_imp.png", width = 9, height = 6)
 
+
 ##Kids sco 5--------------
+library(RColorBrewer)
+library(ggrepel)
+my_purd = brewer.pal(n = 9, "PuRd")[3:9] #there are 9, I exluded the two lighter hues
+my_greens = c("#EAF7E6","#BBE3B4","#41ae76", "#238b45","#00441b") #there are 9, I exluded the two lighter hues
+my_gregra = c("gray47","#BBE3B4","#41ae76", "#238b45","#00441b") #there are 9, I exluded the two lighter hues
+
 A5 <- 
   ggplot() + 
   geom_sf(data=admin0, fill="snow3", color="snow4") +
@@ -178,25 +212,30 @@ A5 <-
   #geom_sf(data=DRC, fill="cornsilk") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=prev), alpha=0.9) + 
-  labs(color='') + 
+  geom_sf(data=output_points, aes(color=prev_grp_f, shape=as.factor(imputed))) + #, alpha=0.9
+    geom_sf(data=drcwat, color="steelblue")+
+    geom_sf(data=drccities, color = "black", shape = "18")+
+    geom_sf_text(data=drccities, aes(label = name), size = 3, fontface = "bold")+
+    labs(color='', shape = '') + 
+  scale_shape_discrete(labels = c("Original","Imputed"))+
   theme_bw(base_size=14) + 
-  #scale_color_distiller(palette = "Greens", direction = 1) +
-  scale_color_distiller(palette = 'Spectral') + 
+  scale_color_manual(values = my_gregra)+
+    #scale_color_brewer(palette = "RdGy", direction = -1) + #YlOrRd
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   #ggtitle("Children ≤ 5")+ # for adding with adult figure
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
+        axis.title = element_blank(),
         axis.ticks=element_blank(), 
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
+        legend.text = element_text(size = 8),
         panel.background = element_rect(fill="#daeff8", color=NA))
 #        legend.position = c(.29, .16), # if want legend inside map outline
 #        legend.background = element_blank()
-
 A5
-ggsave("./Plots/clusterhbvprev.png", width = 9, height = 6)
+ggsave("./Plots/prev5clust.png", width = 9, height = 6)
 
 ### v for supp---------
 A5_sup <- 
@@ -205,11 +244,11 @@ A5_sup <-
   geom_sf(data=DRC, fill="snow2") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=prev), alpha=0.8) + 
-  labs(color='') + 
+  geom_sf(data=output_points, aes(color=prev_grp_f, shape=as.factor(imputed)), alpha=0.9, size=2) + 
+  labs(color='', shape = '') + 
+  scale_shape_discrete(labels = c("Original","Imputed"))+
   theme_bw(base_size=14) + 
-  #scale_color_distiller(palette = "Greens", direction = -1) +
-  scale_color_distiller(palette = 'Spectral') + 
+  scale_color_brewer(palette = "YlGn", direction = 1) + #YlOrRd
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   ggtitle("S/CO cutoff of 5.00 (main analysis)")+
@@ -230,11 +269,11 @@ A1 <-
   geom_sf(data=DRC, fill="snow2") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=prev1), alpha=0.8) + 
-  labs(color='') + 
+  geom_sf(data=output_points, aes(color=prev1_grp_f, shape=as.factor(imputed)), alpha=0.9, size=2) + 
+  labs(color='', shape = '') + 
+  scale_shape_discrete(labels = c("Original","Imputed"))+
   theme_bw(base_size=14) + 
-  #scale_color_distiller(palette = "Greens", direction = -1) +
-  scale_color_distiller(palette = 'Spectral') + 
+  scale_color_brewer(palette = "YlGn", direction = 1) + #YlOrRd
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   ggtitle("S/CO cutoff of 1.00")+
@@ -254,11 +293,11 @@ A2 <-
   geom_sf(data=DRC, fill="snow2") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=prev2), alpha=0.8) + 
-  labs(color='') + # HBV prevalence (%) \nin children < 5
+  geom_sf(data=output_points, aes(color=prev2_grp_f, shape=as.factor(imputed)), alpha=0.9, size=2) + 
+  labs(color='', shape = '') + 
+  scale_shape_discrete(labels = c("Original","Imputed"))+
   theme_bw(base_size=14) + 
-  #scale_color_distiller(palette = "Greens", direction = -1) +
-  scale_color_distiller(palette = 'Spectral') + 
+  scale_color_brewer(palette = "YlGn", direction = 1) + #YlOrRd
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   ggtitle("S/CO cutoff of 2.00")+
@@ -278,11 +317,11 @@ A100 <-
   geom_sf(data=DRC, fill="snow2") +
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=prev100), alpha=0.8) + 
-  labs(color='') + #HBV prevalence (%) \nin children < 5
+  geom_sf(data=output_points, aes(color=prev100_grp_f, shape=as.factor(imputed)), alpha=0.9, size=2) + 
+  labs(color='', shape = '') + 
+  scale_shape_discrete(labels = c("Original","Imputed"))+
   theme_bw(base_size=14) + 
-  #scale_color_distiller(palette = "Greens", direction = -1) +
-  scale_color_distiller(palette = 'Spectral') + 
+  scale_color_brewer(palette = "YlGn", direction = 1) + #YlOrRd
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   ggtitle("S/CO cutoff of 100.00")+
@@ -296,6 +335,30 @@ A100 <-
 A100
 ggsave("./Plots/kid_sco100.png", width = 9, height = 6)
 
+#Reported DPT vaccination------
+dptmap <-
+  ggplot() + 
+  geom_sf(data=admin0, fill="snow3", color="snow4") +
+  geom_sf(data=DRC, fill="snow2") +
+  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
+  geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
+  geom_sf(data=dpt_points, aes(color=avg_pentdos), alpha=0.8) + 
+  labs(color='% in cluster') + 
+  theme_bw(base_size=14) + 
+  scale_color_distiller(palette = "RdYlBu", direction = 1) + #YlOrRd
+  scale_x_continuous(limits=c(12,31)) + 
+  scale_y_continuous(limits=c(-13.5,5.4)) + 
+  ggtitle("Indeterminant tetanus serology")+
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.ticks=element_blank(), 
+        axis.text.x=element_blank(), 
+        axis.text.y=element_blank(),
+        panel.background = element_rect(fill="#daeff8", color=NA),
+        legend.position = c(.29, .16),
+        legend.background = element_blank())
+dptmap
+ggsave('./Plots/dpt_map.png', width=15, height=6)
 
 ## Tetanus Ab------------
 # tet lower is indeterminants as not reactive (lower bound)
@@ -345,31 +408,6 @@ tetupp <-
         legend.background = element_blank())
 tetupp
 
-# since these don't appear different, plot of where kids had indeterminant tetanus ab
-tetdiff <- 
-  ggplot() + 
-  geom_sf(data=admin0, fill="snow3", color="snow4") +
-  geom_sf(data=DRC, fill="snow2") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=tetdiff), alpha=0.8) + 
-  labs(color='% in cluster') + 
-  theme_bw(base_size=14) + 
-  #scale_color_distiller(palette = 'Grays', direction=1) + 
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  ggtitle("Indeterminant tetanus serology")+
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA),
-        legend.position = c(.29, .16),
-        legend.background = element_blank())
-tetdiff
-tetlow + tetupp + tetdiff + plot_layout(nrow=1, ncol = 3) #+ plot_annotation(tag_levels = 'A')
-ggsave('./Plots/tet_imp.png', width=15, height=6)
 
 #Kriging-------------
 # kriging using gstat: https://rpubs.com/nabilabd/118172 
@@ -641,9 +679,10 @@ D
 # drc prov bound if not read in elsewhere
 drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%   st_transform(4326)
 
-# weighted by province
+# weighted by province------------
 library(survey)
 library(srvyr)
+library(readxl)
 #df5 <- # figure out how to transpose 
 svyby(~prov2015,~hbvresult5, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
 svyby(~prov2015,~hbvresult1, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
@@ -651,43 +690,64 @@ svyby(~prov2015,~hbvresult2, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu=
 svyby(~prov2015,~hbvresult100, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
 
 wtdctskids <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx",
-                         sheet = "Dec 7form")
+                         sheet = "feb17 form")
 
 wtdctskids$total <- wtdctskids$hbvpos5 + wtdctskids$hbvneg5
 wtdctskids$prev5 <- (wtdctskids$hbvpos5/wtdctskids$total)*100
 wtdctskids$prev1 <- (wtdctskids$hbvpos1/wtdctskids$total)*100
 wtdctskids$prev2 <- (wtdctskids$hbvpos2/wtdctskids$total)*100
 wtdctskids$prev100 <- (wtdctskids$hbvpos100/wtdctskids$total)*100
-view(wtdctskids)
+view(output_df)
 
 ## WHAT ARE PROV NAMES - MAKE SURE THEY MATCH THE DRCPROV OBJECT
 wtdctskids$ADM1_NAME <- toupper(wtdctskids$provnamesimp)
 drcprov_hbvkids <- left_join(drcprov,wtdctskids, by="ADM1_NAME")
 view(drcprov_hbvkids)
 
+provcentrs <- st_centroid(drcprov_agesex)
+provcentrs <- st_sf(st_point_on_surface(drcprov_agesex)) %>% distinct(geometry, hyphen)
+coords <- st_coordinates(provcentrs)
+
+colab <- cbind(provcentrs, coords)
+view(colab)
+
 prov5 <-
   ggplot()+
   geom_sf(data=admin0, fill="snow3", color="snow4") +
   geom_sf(data=drcprov_hbvkids,  mapping=aes(fill=prev5))+
-  scale_fill_distiller(palette = 'BuPu', direction = 1) + # Greens
+  #scale_fill_manual(values = my_greens)+
+  scale_fill_distiller(palette = 'Greens', direction = 1) + #  YlGn
 #  scale_fill_distiller(palette = 'Spectral') +
   theme_bw(base_size=14) + 
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen!="Kasai-Oriental" & drcprov_agesex$hyphen!="Kasai-Central" &drcprov_agesex$hyphen!="Tshopo" &drcprov_agesex$hyphen!="Lomami" ,], 
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 2) + #fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 2) + #, fontface = "bold"
+  #  geom_text_repel(data= colab, mapping=aes(x = X, y = Y, label = hyphen),
+#               size = 3, fontface = "bold"  ) +
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
+        axis.title = element_blank(),
         axis.ticks=element_blank(), 
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA),
         legend.title = element_blank())
-ggsave("./Plots/kidprev_wtdall.png", width = 6, height = 6)
+prov5
+ggsave("./Plots/kidprev_wtdall_f.png", width = 6, height = 6)
 
 ##Main maps together---------
-Z + A5 + B5 + prov5 + plot_layout(nrow=1, ncol = 4) + plot_annotation(tag_levels = 'A')
-ggsave('./Plots/main_maps_imp.png', width=15, height=6)
+A5 + prov5 + plot_layout(nrow=1, ncol = 2) + plot_annotation(tag_levels = 'A')
+ggsave('./Plots/main_maps2_imp3.png', width=12, height=6)
 
-##all sensitivity analyses together
+
+
+
+##all sensitivity analyses together-----------
 A1 + B1 + A2 + B2 + A5_sup + B5_supp + A100 + B100 + plot_layout(nrow=4, ncol = 2) #+ plot_annotation(tag_levels = 'A')
 ggsave('./Plots/sens_maps.png', width=12, height=20)
 
@@ -1006,15 +1066,8 @@ ggplot() +
 
 
 # weighted prov prev by age group-----
-
-kidsmap_impsf <- kidsmap_impsf %>% 
-  dplyr::mutate(sex=factor(
-    kidsmap_impsf$hv104, 
-    levels = c(1, 2),
-    labels = c("Male", "Female")))
-
-wtdage <- kidsmap_impsf %>% select(hv001,cluster_hh, prov2015, hv105, sex, hbvresultlowna, hbvresultlowpos, geometry, shtetaindasno, shtetaindasyes) 
-output <- wtdage %>% group_by(hv105, hv001) %>% dplyr::summarize(n=n(),
+wtdage <- kidsmap_impsf %>% select(hv001,cluster_hh, prov2015, hv105_fromhc1_f, sex, hbvresult5, hbvresult1, hbvresult2, hbvresult100, geometry, tetab, dpt_count) 
+output <- wtdage %>% group_by(hv105_fromhc1_f, hv001) %>% dplyr::summarize(n=n(),
                                                                    npos = sum(hbvresultlowna==1),
                                                                    prev = mean(hbvresultlowna, na.rm=T)*100,
                                                                    prev_u = mean(hbvresultlowpos, na.rm=T)*100,
@@ -1064,11 +1117,7 @@ ggplot() +
 ggsave('./Plots/provagesex.png', width=12, height=6)
   
 # weight age/sex prov counts
-kid_hbv_kr_dis <- kid_hbv_kr_dis %>% 
-  dplyr::mutate(sex=factor(
-    kid_hbv_kr_dis$hv104, 
-    levels = c(1, 2),
-    labels = c("Male", "Female")))
+
 #wtd prov overall by sex
 output_prov_sex <- wtdage %>% group_by(sex,hv105, prov2015) %>% 
   dplyr::summarize(n=n(),
