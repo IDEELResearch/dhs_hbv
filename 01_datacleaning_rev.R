@@ -44,8 +44,9 @@ dhsmeta %>% filter(hv027==1 &  hv105 < 6 & (hc1>=6 | is.nan(hc1)) & sh310a == 1)
 dhsmeta <- dhsmeta %>% mutate_at(c('hv027', 'hc1', 'sh310a', 'hv103'), as.numeric) 
 elig_kids <- dhsmeta %>% filter(hv027==1 & (hc1 >= 6 & hc1<=59) & sh310a == 1 & hv103==1) # %>% select(cluster_hh, hv001, hv002, hvidx, kids_barcode, hv105, hv104, hc1, hv270, pfldh_kids,
                                                                                           #           hv005, hv006, hv024, shnprovin, hv025, hv040, hv201, hv106, hv246, hml1, hml10, hml20, hv027, hv028)
-elig_kids_2 <- dhsmeta %>% filter(hv027==1 & hv105 < 6 & (hc1>=6 | is.nan(hc1)) & sh310a == 1) %>% select(cluster_hh, hv001, hv002, hvidx, kids_barcode, hv105, hv104, hc1, hv270, pfldh_kids,
-                                                                                                          hv005, hv006, hv024, shnprovin, hv025, hv040, hv201, hv106, hv246, hml1, hml10, hml20, hv027, hv028)
+#weight up to full n=8547 with propensity score
+elig_kids_2 <- dhsmeta %>% filter(hv027==1 & (hc1 >= 6 & hc1<=59)) #%>% select(cluster_hh, hv001, hv002, hvidx, kids_barcode, hv105, hv104, hc1, hv270, pfldh_kids,sh310a,hv103,
+                                                                   #                                      hv005, hv006, hv024, shnprovin, hv025, hv040, hv201, hv106, hv246, hml1, hml10, hml20, hv027, hv028)
 
 # if subsetting kids from cdpr61dt: elig_kids$kids_barcode <- tolower(elig_kids$sh312)
 
@@ -60,7 +61,7 @@ elig_kids_2 <- elig_kids_2 %>% mutate(validbarcode = case_when(
   grepl("\\?", elig_kids_2$kids_barcode) ~ 0,
   TRUE ~ 1
 ))
-table(elig_kids_2$validbarcode, useNA = "always")
+table(barcode = elig_kids_2$validbarcode, consent =elig_kids_2$sh310a, useNA = "always")
 
 # add hbv results onto this eligible kid df
 elig_kids_wres <- left_join(elig_kids, kid_hbv_kr_dis[,c("kids_barcode", grep("hbv", names(kid_hbv_kr_dis), value=T))], by = "kids_barcode")
@@ -89,12 +90,13 @@ table(nores$pfldh_kids, useNA = "always")
 
 # connect hh members
 elig_kids_whbvres %>% summarize(count_distinct = n_distinct(cluster_hh))
+elig_kids_2_whbvres %>% summarize(count_distinct = n_distinct(cluster_hh))
 
 # propensity score code to address missingness-----------
 ## see spring 2022 EPID 722 exercise 4 (starting at q6)
 
 # indicator variable for barcode analyzed or not, has pf result, pf+/pf-/no pf result - children 6-59mo
-elig_kids <- elig_kids %>% mutate(bc_select = case_when(
+elig_kids_2 <- elig_kids_2 %>% mutate(bc_select = case_when( # exchange between elig_kids_2 (n=8547) and elig_kids (n=8182)
   kids_barcode %in% kid_hbv_kr_dis$kids_barcode ~ 1,
   TRUE ~ 0),
   haspfres = case_when(
@@ -123,48 +125,48 @@ elig_kids <- elig_kids %>% mutate(bc_select = case_when(
     hv105_fromhc1 != hv105 ~ 0)
   )
 
-table(elig_kids$pf_posvsoth, useNA = "always")
-table(elig_kids$hc1, useNA = "always")
-table(elig_kids$hv105, useNA = "always")
+table(elig_kids_2$pf_posvsoth, useNA = "always")
+table(elig_kids_2$hc1, useNA = "always")
+table(elig_kids_2$hv105, useNA = "always")
 
 #ps with full barcodes/dataset
 ## vars of prop score: hv006 - month of interview; shnprovin - province (try hv024, the pre-2015 provinces, if rank deficient warning affects);
 ## hv025 - urban/rural; hv040 - cluster altitude in meters; hv104 - sex; hv201 - source of drinking water; hv106 - education (delete for kids?);
 ## hv246 - owns livestock; hml1 - mosquito nets; hml10 - insecticide treated net; hml20 - slept under net; hv270 - hh wealth; hv105 - age
-selectioninstudy <- glm(bc_select ~ hv006+shnprovin+hv025+hv104+hv246+hv270+hv105_fromhc1+pf_posvsoth, #check removing: +hml10+hml20; removed: hv106 (education), hml1 (has net), hv201 (water)
+selectioninstudy <- glm(bc_select ~ hv006 + shnprovin + hv025 + hv104 + hv246 + hv270 + hv105_fromhc1 + pf_posvsoth + sh310a + hv103, #check removing: +hml10+hml20; removed: hv106 (education), hml1 (has net), hv201 (water)
                         data=elig_kids,
                         family=binomial("logit"))
 summary(selectioninstudy$coefficients) # vary significantly - more work into what should be included
 # getting warning about rank deficiency
 
 # denom of weights
-elig_kids$d <- predict(selectioninstudy, elig_kids, type = "response")
+elig_kids_2$d <- predict(selectioninstudy, elig_kids_2, type = "response")
 
 # numerator of weights
 num_mod <- glm(bc_select ~ 1, 
-               data = elig_kids, 
+               data = elig_kids_2, 
                family = "binomial"(link="logit"))
 
-elig_kids$n <- predict(num_mod, data = elig_kids, type = "response")
+elig_kids_2$n <- predict(num_mod, data = elig_kids_2, type = "response")
 
 #unstandardized and standardized
 
 ### for standardized 
-p_exposure <- sum(elig_kids$bc_select) / nrow(elig_kids)
-summary(elig_kids$n)
+p_exposure <- sum(elig_kids_2$bc_select) / nrow(elig_kids_2)
+summary(elig_kids_2$n)
 
-elig_kids <- elig_kids %>% 
+elig_kids_2 <- elig_kids_2 %>% 
   mutate(sw = ifelse(bc_select == 1, n/d, (1-n)/(1-d)), # from 722 code
          iptw_u = ifelse(bc_select==1, 1/d, 1/(1-d)),
          iptw_s = ifelse(bc_select==1, p_exposure/d, (1-p_exposure)/(1-d))
   )
-summary(elig_kids$sw) # 722 standardized weights
-summary(elig_kids$iptw_u) # unstandardized weights from Hillary
-summary(elig_kids$iptw_s) # standardized weights from Hillary
-nrow(elig_kids)
+summary(elig_kids_2$sw) # 722 standardized weights
+summary(elig_kids_2$iptw_u) # unstandardized weights from Hillary
+summary(elig_kids_2$iptw_s) # standardized weights from Hillary
+nrow(elig_kids_2)
 
 #look at distribution of weights, by whether sample was tested for hbv
-elig_kids %>% 
+elig_kids_2 %>% 
   ggplot() + geom_histogram(aes(x=sw)) + facet_wrap(~bc_select, nrow = 2)
 
 # Q to confirm - once subsetted into participants who are included, the weights will just not sum to 1, right? or does standardization take care of that
@@ -173,10 +175,10 @@ summary(test$sw)
 summary(test$iptw_s)
 mean(test$sw)
 
-elig_kids_whbvres_wt <- left_join(elig_kids_whbvres, elig_kids[,c("kids_barcode","iptw_s")], by ="kids_barcode")
+elig_kids_whbvres_wt <- left_join(elig_kids_2_whbvres, elig_kids_2[,c("kids_barcode","iptw_s")], by ="kids_barcode")
 summary(elig_kids_whbvres_wt$iptw_s)
 mean(elig_kids_whbvres_wt$iptw_s)
-
+nrow(elig_kids_whbvres_wt)
 # add and check unstabilized weights 
 test2 <- left_join(elig_kids_whbvres, elig_kids[,c("kids_barcode","iptw_s","iptw_u")], by ="kids_barcode")
 summary(test2$iptw_u)
@@ -235,6 +237,9 @@ elig_kids_whbvres_wt <- elig_kids_whbvres_wt %>% mutate(
     hv024 == "8" ~ 6,# orientale
     hv024 == "9" |  hv024 == "11"  ~ 7,# Kivus
     hv024 == "10" ~ 8), # maniema
+provgrp_kin_l = factor(provgrp_kin,
+    levels = c(1,2,3,4,5,6,7,8),
+    labels = c("Kinshasa","Kongo central/Bandundu", "Equateur", "Kasai", "Katanga", "Orientale", "Kivu", "Maniema")),
 # tetanus serology indicators
   shtetaindasno = case_when(
     shteta=="0" ~ 0,
@@ -319,7 +324,7 @@ elig_kids_whbvres_wt %>% group_by(hc71, weightforage) %>% count()
 elig_kids_whbvres_wt %>% group_by(hc57, anemia) %>% count()
 
 # convert certain variables to factors for analysis
-elig_kids_whbvres_wt <- elig_kids_whbvres_wt %>% mutate_at(c('sevstunt', 'modstunt', 'stunt', 'sevwasting', 'modwasting', 'wasting', 'weightforage'), as.factor)
+elig_kids_whbvres_wt <- elig_kids_whbvres_wt %>% mutate_at(c('sevstunt', 'modstunt', 'stunt', 'sevwasting', 'modwasting', 'wasting', 'weightforage', 'anemia'), as.factor)
 
 
 #Merge KR vars on------
@@ -435,10 +440,36 @@ elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% dplyr::mutate(
         labels = c("Poorest", "Poorer", "Middle", "Richer", "Richest")),
     pfmalaria = factor(pfldh_kids,
         levels = c(0,1),
-        labels = c("Pf-positive", "Pf-negative")),
+        labels = c("Pf-negative", "Pf-positive")),
     tetab = factor(shteta,
         levels = c(0,1,3),
-        labels = c("Nonreactive", "Reactive", "Indeterminate")))
+        labels = c("Nonreactive", "Reactive", "Indeterminate")),
+    anemia_f = case_when(
+      anemia == "1" ~ "Mild-to-none", 
+      anemia == "2" ~ "Mild-to-none", 
+      anemia == "3" ~ "Moderate-to-severe", 
+      anemia ==  "4" ~ "Moderate-to-severe", 
+        is.na(anemia) ~ "Not available"),
+    modstunt_f = case_when(
+        modstunt == 0 ~ "No stunting",
+        modstunt == 1 ~ "Moderate-to-severe",
+        modstunt == 9 ~ "Not available",
+        is.na(modstunt) ~ "Not available"),
+    dpt_doses_f = case_when(
+      dpt_doses == 0 ~ "No doses received",
+      dpt_doses == 1 ~ "Series incomplete",
+      dpt_doses == 2 ~ "Series completed",
+      is.na(dpt_doses) ~ "Not available"),
+    injec_f = case_when(
+      injec == 0 ~ "None",
+      injec == 1 ~ "1-12",
+      injec == 2 ~ "13-24",
+      injec == 3 ~ "25+",
+      is.na(injec) ~ "Not available"),
+    beat_f = case_when(
+      beat == 0 ~ "Never justified",
+      beat == 1 ~ "Justified",
+      is.na(beat) ~ "Not available"))
 
 # positives by household
 poskids <- elig_kids_whbvres_wt_kr %>% group_by(cluster_hh) %>% 
@@ -450,4 +481,5 @@ elig_kids_whbvres_wt_kr <- left_join(elig_kids_whbvres_wt_kr, poskids[,c("cluste
 elig_kids_whbvres_wt_kr %>% group_by(percpos, poskids) %>% count()
 
 elig_kids_whbvres_wt_kr$hv014 <- as.numeric(elig_kids_whbvres_wt_kr$hv014)
+elig_kids_whbvres_wt_kr$poskids <- as.factor(elig_kids_whbvres_wt_kr$poskids)
 
