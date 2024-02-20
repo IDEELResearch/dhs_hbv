@@ -16,84 +16,31 @@ cbind(Term = trm[asgn[-1]],
 #      Term    Category
 
 # kids---------------------
-# add weight variable
-kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
+# elig_kids_whbvres_wt_kr
 library(survey)
 library(srvyr)
 library(tidyverse)
 library(broom)
 
-kid_dhs_int <- kid_dhs_int %>% mutate(
-  jaundice = case_when(
-    sh318f == 1 ~ 1,
-    sh318f == 0 ~ 0,
-    is.nan(sh318f) ~ NA_real_))  
-table(kid_dhs_int$jaundice, kid_dhs_int$hbvresult, useNA = "always")
-
-kid_hbv_kr_dis$modstunt <- ifelse(is.na(kid_hbv_kr_dis$modstunt), 9, kid_hbv_kr_dis$modstunt)
-kid_hbv_kr_dis$modwasting <- ifelse(is.na(kid_hbv_kr_dis$modwasting), 9, kid_hbv_kr_dis$modwasting)
-
-kid_hbv_kr_dis <- kid_hbv_kr_dis %>% mutate(stunt_mod = case_when(
-      modstunt=="1" ~ "0",
-      modstunt=="2" ~ "1",
-      modstunt=="3" ~ "9",
-      modstunt=="9" ~ "9"),
-    wast_mod = case_when(
-      modwasting=="1" ~ "0",
-      modwasting=="2" ~ "1",
-      modwasting=="3" ~ "9",
-      modwasting=="9" ~ "9")
-  )
-table(kid_hbv_kr_dis$wast_mod, kid_hbv_kr_dis$modwasting)
-table(kid_hbv_kr_dis$stunt_mod, kid_hbv_kr_dis$modstunt)
-
 # Outcome vars: missingness and sens analyses------------------
-# hbvresultlowna: 46 low vol counted as negative, S/CO = 5
-# hbvresult: 46 as missing, S/CO = 5
-# hbvresultlowpos: 46 as pos, S/CO = 5
+# hbvresult5, hbvresult1, hbvresult2, hbvresult100
+elig_kids_whbvres_wt_kr_nomiss <- elig_kids_whbvres_wt_kr_nomiss %>% mutate_at(c("beat","injec"), as.factor)
+elig_kids_whbvres_wt_kr_nomiss <- elig_kids_whbvres_wt_kr %>% filter(anemia_f != "Not available")
 
-# using the S/Co=5, put 46 low vol as pos
-kid_hbv_kr_dis$hbvresultlowpos <- ifelse(kid_hbv_kr_dis$catresult=="low vol",1,kid_hbv_kr_dis$hbvresult)
+elig_kids_whbvres_wt_kr_nomiss$sex <- relevel(elig_kids_whbvres_wt_kr_nomiss$sex, ref = "Female")
 
-table(kid_hbv_kr_dis$hbvresult, kid_hbv_kr_dis$hbvresultlowna, useNA = "always")
-table(kid_hbv_kr_dis$hbvresult, kid_hbv_kr_dis$catresult, useNA = "always")
-table(kid_hbv_kr_dis$hbvresultlowna, kid_hbv_kr_dis$catresult, useNA = "always")
-table(kid_hbv_kr_dis$hbvresultlowpos, kid_hbv_kr_dis$catresult, useNA = "always")
-
-k_df <- dhsmeta %>% filter(kids_barcode != '') %>% select(kids_barcode, hv001, hv002)
-view(k_df)
-k_df <- k_df %>% distinct(kids_barcode, .keep_all = TRUE)
-
-k_df <- k_df %>% mutate(dbs999 = if_else(startsWith(kids_barcode, "999") | startsWith(kids_barcode, "?"), 1, 0))
-table(k_df$dbs999)
-
-knohbres <- k_df %>% filter(!(kids_barcode %in% kid_hbv_kr_dis$kids_barcode))
-nrow(k_df) - nrow(knohbres)
-nrow(kid_hbv_kr_dis)
+table(elig_kids_whbvres_wt_kr$beat_f)
+table(elig_kids_whbvres_wt_kr$anemia_f, elig_kids_whbvres_wt_kr$hbvresult5)
 # discuss with Jess about what to do with the 2908 - impute, leave out, etc.
 # for now proceed with bounding the 46 with low vol
 
-# save char vars as factors before survey design
-kid_hbv_kr_dis$provgrp <- as.factor(kid_hbv_kr_dis$provgrp)
-kid_hbv_kr_dis$provgrp_kin <- as.factor(kid_hbv_kr_dis$provgrp_kin)
-kid_hbv_kr_dis$dpt_doses <- as.factor(kid_hbv_kr_dis$dpt_doses)
-kid_hbv_kr_dis$injec <- as.factor(kid_hbv_kr_dis$injec)
-
-# make char sex variable comparing Male to Female
-kid_hbv_kr_dis <- kid_hbv_kr_dis %>% # 1=male, 2=female but make 0=female, 1=male
-  dplyr::mutate(sex=case_when(
-    hv104 == "1" ~ "1",
-    hv104 == "2" ~ "0"
-  ))
-
+# go through 01_datacleaning_rev.R) to obtain elig_kids_whbvres_wt_kr
 # make survey design object
-designf <-svydesign(ids=kid_hbv_kr_dis$hv001, strata=kid_hbv_kr_dis$hv022 , weights=kid_hbv_kr_dis$hh_weight,  data=kid_hbv_kr_dis)
+# weight variable decisions: hh_weight (frmo hv005), hv028_div, both_wt_new (hv005 + propens score), both_wt_old (hv028 + propens score)
+designf <-svydesign(ids=elig_kids_whbvres_wt_kr_nomiss$hv001, strata=elig_kids_whbvres_wt_kr_nomiss$hv022 , weights=elig_kids_whbvres_wt_kr_nomiss$both_wt_new,  data=elig_kids_whbvres_wt_kr_nomiss)
 options(survey.lonely.psu="adjust")
 designf_dhs2 <-as_survey_design(designf)
-
 # vars to run - c("hbvresult","catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
-
-# run for hbvresultlowna and hbvresultlowpos as outcome vars
 
 # age
 kid_age <- svyglm(hbvresult5 ~ as.factor(hv105), designf_dhs2, family=quasibinomial("log"))
@@ -125,7 +72,7 @@ kid_weal <- svyglm(hbvresult ~ as.factor(hv270), designf_dhs2, family=quasibinom
 summary(kid_weal)
 confint(kid_weal)
 
-# wealth
+# pf malaria
 kid_pf <- svyglm(hbvresult ~ as.factor(pfldh_kids), designf_dhs2, family=quasibinomial("log"))
 kid_pf <- svyglm(hbvresult ~ as.factor(pfldh_kids), designf_dhs2, family=quasibinomial("identity"))
 summary(kid_pf)
@@ -147,10 +94,11 @@ summary(kid_tet)
 confint(kid_tet)
 
 # province - shnprovin too many groups, provgrp_kin (8 levels), provgrp (7 levels)
-kid_prov <- svyglm(hbvresult ~ as.factor(provgrp), designf_dhs2, family=quasibinomial("log"))
-kid_prov <- svyglm(hbvresult ~ as.factor(provgrp_kin), designf_dhs2, family=quasibinomial("identity")) # not converging
+kid_prov <- svyglm(hbvresult5 ~ as.factor(prov2015), designf_dhs2, family=quasibinomial("log"))
+kid_prov <- svyglm(hbvresult5 ~ as.factor(provgrp_kin_l), designf_dhs2, family=quasibinomial("identity")) # not converging
 summary(kid_prov)
 confint(kid_prov)
+exp(kid_prov$coefficients)
 
 # code var for other kid pos in hh
 kid_clust <- svyglm(hbvresult ~ as.factor(totalkidpos_f), designf_dhs2, family=quasibinomial("log"))
@@ -158,134 +106,112 @@ kid_clust <- svyglm(hbvresult ~ as.factor(totalkidpos_f), designf_dhs2, family=q
 summary(kid_clust)
 confint(kid_clust)
 
-# adjusted?
-kid_adj <- svyglm(hbvresult ~  as.factor(shteta) + as.factor(pfldh_kids), designf_dhs2, family=quasibinomial("log")) # 
-summary(kid_adj)
-confint(kid_adj)
-
-
 inj <- svyglm(hbvresultlowna ~ totalkidpos_f, designf_dhs2, family=quasibinomial("identity"))
 summary(inj)
 confint(inj)
 
-# Frequencies
-vars <- c("hv105", 'sex','hv025','hv026','hv270','jaundice',"stunt_mod", "wast_mod", 'pfldh_kids','shtetaindasno', "dpt_doses", "dpt_count", "injec", "beat", "provgrp_kin")
-addmargins(table(kid_hbv_kr_dis$hv105, useNA = "always"))
-addmargins(table(kid_hbv_kr_dis$wast_mod, useNA = "always"))
-n=nrow(kid_hbv_kr_dis)
-1372/n
-addmargins(table(kid_hbv_kr_dis$beat, useNA = "always"))
-1831/n
-addmargins(table(kid_hbv_kr_dis$dpt_doses, useNA = "always"))
-1843/n
-addmargins(table(kid_hbv_kr_dis$hv270, useNA = "always"))
-1833/n
-13/n
-6851+46
+beat <- svyglm(hbvresult5 ~ beat_f, designf_dhs2, family=quasibinomial("identity"))
+summary(beat)
+confint(beat)
+
 # as function----
-vars <- c("hv105", 'sex','hv025','hv026','hv270','jaundice',"stunt_mod", "wast_mod", 'pfldh_kids','shtetaindasno', "dpt_doses", "dpt_count", "injec", "beat", "provgrp_kin")
+vars <- c("hv105_fromhc1_f", 'sex','reltoheadhh_simp', 'urbanrural','location','wealth','anemia_f',"modstunt", 'pfmalaria','tetab', "dpt_doses_f", 'injec','beat')
+# run separately: "injec_f", 'v480', provgrp_kin_l, ,  "beat_f"
 
-bivs_asneg <- function(var){ # glm function
-  m <- svyglm(as.formula(paste0('hbvresultlowna ~', var)), designf_dhs2, family=quasibinomial("identity"))
+bivs_5 <- function(var){ # glm function
+  m <- svyglm(as.formula(paste0('hbvresult5 ~', var)), designf_dhs2, family=quasibinomial("identity"))
   cbind(tidy(m, exponentiate = FALSE), confint(m, method = c("Wald"))) %>% filter(stringr::str_detect(term, var))}
 
-bivs_aspos <- function(var){ # glm function
-  m <- svyglm(as.formula(paste0('hbvresultlowpos ~', var)), designf_dhs2, family=quasibinomial("identity"))
-  cbind(tidy(m, exponentiate = FALSE), confint(m, method = c("Wald"))) %>% filter(stringr::str_detect(term, var))}
+glmresults_5 <- map_dfr(vars,bivs_5) 
+glmresults_5 %>% print(noSpaces=T) 
 
-glmresults_low <- map_dfr(vars,bivs_asneg) 
-glmresults_low %>% print(noSpaces=T) 
-
-glmresults_up <- map_dfr(vars,bivs_aspos) 
-glmresults_up %>% print(noSpaces=T) 
-
-glmresults_low$bound <- "Lower"
-glmresults_up$bound <- "Upper"
-
-glmresults <- rbind(glmresults_low, glmresults_up)
-view(glmresults)
-
-glmresults$pd100 <- glmresults$estimate*100
-glmresults$pdcilow100 <- glmresults$`2.5 %`*100
-glmresults$pdciup100 <- glmresults$`97.5 %`*100
-
-glmresults <- glmresults %>%  
+glmresults_5 <- glmresults_5 %>% mutate(
+  pd100 = estimate*100,
+  pdcilow100 = `2.5 %`*100,
+  pdciup100 = `97.5 %`*100)
+  
+glmresults_5 <- glmresults_5 %>%  
   mutate(variable = case_when( # can ignore case with grepl("re", term, ignore.case = TRUE) ~"Group2"))
-    grepl("hv270", term) ~ "Wealth",
+    grepl("wealth", term) ~ "Wealth",
     grepl("provgrp_kin", term) ~"Region",
-    grepl("hv026", term) ~"Location",
-    grepl("hv105", term) ~"Age",
-    grepl("dpt", term) ~"DPT vaccine",
+    grepl("location", term) ~"Location",
+    grepl("hv105_fromhc1_f", term) ~"Age",
+    grepl("reltoheadhh_simp", term) ~"Relation to head of house",
+    grepl("dpt_doses_f", term) ~"DPT vaccine",
     grepl("beat", term) ~"Beating justified",
-    grepl("hv025", term) ~"Rurality",
+    grepl("urbanrural", term) ~"Rurality",
     grepl("sex", term) ~"Sex",
+    grepl("anemia_f", term) ~"Nutrition",
     grepl("injec", term) ~"Injections",
-    grepl("pfldh_kids", term) ~"Pf",
-    grepl("jaundice", term) ~"Jaundice",
-    grepl("tet", term) ~"TetAb",
-    grepl("mod", term) ~"Anthropometry", # stunting and wasting together
+    grepl("pfmalaria", term) ~"Pf",
+    grepl("tetab", term) ~"TetAb",
+    grepl("mod", term) ~"Nutrition", # stunting and wasting together
   ),
   caretakesubset = case_when( # variables only asked to caretakers/mothers of children sampled
     variable %in% c("Anthropometry","DPT vaccine", "Injections","Beating justified") ~ 1,
     TRUE ~ 0
   )) 
-table(glmresults$caretakesubset)
+table(glmresults_5$caretakesubset)
 
-rownames(glmresults) <- 1:nrow(glmresults)
-glmresults <- glmresults %>% arrange(variable, term)
-glmresults <- glmresults  %>%  mutate(desorder=row_number())
+rownames(glmresults_5) <- 1:nrow(glmresults_5)
+glmresults_5 <- glmresults_5 %>% arrange(variable, term)
+glmresults_5 <- glmresults_5  %>%  mutate(desorder=row_number())
 
-table(glmresults$term)
-view(glmresults)
+table(glmresults_5$term)
+view(glmresults_5)
 
-glmresults$term[glmresults$term == "beat"] <- "Beating justified vs not"
-#glmresults$term[glmresults$term == "dpt_count"] <- "# of DPT doses (continuous)"
-glmresults$term[glmresults$term == "dpt_count"] <- "Num of DPT doses (continuous)"
-glmresults$term[glmresults$term == "dpt_doses1"] <- "DPT initiated (1-2 doses) vs not started (0 doses)"
-glmresults$term[glmresults$term == "dpt_doses2"] <- "DPT series complete (3 doses) vs not started (0 doses)"
-glmresults$term[glmresults$term == "hv0252"] <- "Rural vs urban"
-glmresults$term[glmresults$term == "hv0261"] <- "Small city vs capital"
-glmresults$term[glmresults$term == "hv0262"] <- "Town vs capital"
-glmresults$term[glmresults$term == "hv0263"] <- "Countryside vs capital"
-glmresults$term[glmresults$term == "hv1042"] <- "Female vs male"
-glmresults$term[glmresults$term == "sex1"] <- "Male vs Female"
-glmresults$term[glmresults$term == "hv1051"] <- "1 year vs <1 year"
-glmresults$term[glmresults$term == "hv1052"] <- "2 years vs <1 year"
-glmresults$term[glmresults$term == "hv1053"] <- "3 years vs <1 year"
-glmresults$term[glmresults$term == "hv1054"] <- "4 years vs <1 year"
-glmresults$term[glmresults$term == "hv1055"] <- "5 years vs <1 year"
-glmresults$term[glmresults$term == "hv2702"] <- "Poorer vs poorest"
-glmresults$term[glmresults$term == "hv2703"] <- "Middle vs poorest"
-glmresults$term[glmresults$term == "hv2704"] <- "Richer vs poorest"
-glmresults$term[glmresults$term == "hv2705"] <- "Richest vs poorest"
-glmresults$term[glmresults$term == "injec1"] <- "1-12 injections vs none"
-glmresults$term[glmresults$term == "injec2"] <- "12-24 injections vs none"
-glmresults$term[glmresults$term == "injec3"] <- "≥25 injections"
-glmresults$term[glmresults$term == "jaundice"] <- "Jaundice vs not"
-glmresults$term[glmresults$term == "pfldh_kids1"] <- "Pf malaria+ vs -"
-glmresults$term[glmresults$term == "provgrp_kin2"] <- "Kongo Central/Bandundu vs Kinshasa"
-glmresults$term[glmresults$term == "provgrp_kin3"] <- "Equateur vs Kinshasa"
-glmresults$term[glmresults$term == "provgrp_kin4"] <- "Kasais vs Kinshasa"
-glmresults$term[glmresults$term == "provgrp_kin5"] <- "Katanga vs Kinshasa"
-glmresults$term[glmresults$term == "provgrp_kin6"] <- "Orientale vs Kinshasa"
-glmresults$term[glmresults$term == "provgrp_kin7"] <- "Kivus vs Kinshasa"
-glmresults$term[glmresults$term == "provgrp_kin8"] <- "Maniema vs Kinshasa"
-glmresults$term[glmresults$term == "shtetaindasno"] <- "Tetanus Ab+ vs -"
-glmresults$term[glmresults$term == "stunt_mod1"] <- "Mod-to-severe stunting vs none"
-glmresults$term[glmresults$term == "stunt_mod9"] <- "Missing stunting vs none"
-glmresults$term[glmresults$term == "wast_mod1"] <- "Mod-to-severe wasting vs none"
-glmresults$term[glmresults$term == "wast_mod9"] <- "Missing wasting vs none"
+glmresults_5$term[glmresults_5$term == "beat1"] <- "Beating justified vs not"
+#glmresults_5$term[glmresults_5$term == "dpt_count"] <- "# of DPT doses (continuous)"
+glmresults_5$term[glmresults_5$term == "dpt_doses_fNot available"] <- "Not available"
+glmresults_5$term[glmresults_5$term == "dpt_doses_fSeries incomplete"] <- "DPT initiated (1-2 doses) vs not started (0 doses)"
+glmresults_5$term[glmresults_5$term == "dpt_doses_fSeries completed"] <- "DPT series complete (3 doses) vs not started (0 doses)"
+glmresults_5$term[glmresults_5$term == "urbanruralRural"] <- "Rural vs urban"
+glmresults_5$term[glmresults_5$term == "locationSmall city"] <- "Small city vs capital"
+glmresults_5$term[glmresults_5$term == "locationTown"] <- "Town vs capital"
+glmresults_5$term[glmresults_5$term == "locationCountryside"] <- "Countryside vs capital"
+glmresults_5$term[glmresults_5$term == "reltoheadhh_simpGrandchild"] <- "Grandchild vs child"
+glmresults_5$term[glmresults_5$term == "reltoheadhh_simpOther"] <- "Other vs child"
+#glmresults_5$term[glmresults_5$term == "hv1042"] <- "Female vs male"
+glmresults_5$term[glmresults_5$term == "sexMale"] <- "Male vs Female"
+glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f1"] <- "1 year vs <1 year"
+glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f2"] <- "2 years vs <1 year"
+glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f3"] <- "3 years vs <1 year"
+glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f4"] <- "4 years vs <1 year"
+glmresults_5$term[glmresults_5$term == "wealthPoorer"] <- "Poorer vs poorest"
+glmresults_5$term[glmresults_5$term == "wealthMiddle"] <- "Middle vs poorest"
+glmresults_5$term[glmresults_5$term == "wealthRicher"] <- "Richer vs poorest"
+glmresults_5$term[glmresults_5$term == "wealthRichest"] <- "Richest vs poorest"
+glmresults_5$term[glmresults_5$term == "injec1"] <- "1-12 injections vs none"
+glmresults_5$term[glmresults_5$term == "injec2"] <- "12-24 injections vs none"
+glmresults_5$term[glmresults_5$term == "injec3"] <- "≥25 injections vs none"
+glmresults_5$term[glmresults_5$term == "anemia_fModerate-to-severe"] <- "Anemia: moderate-to-severe vs mild-to-none"
+glmresults_5$term[glmresults_5$term == "pfmalariaPf-positive"] <- "Pf malaria+ vs -"
+glmresults_5$term[glmresults_5$term == "provgrp_kin2"] <- "Kongo Central/Bandundu vs Kinshasa"
+glmresults_5$term[glmresults_5$term == "provgrp_kin3"] <- "Equateur vs Kinshasa"
+glmresults_5$term[glmresults_5$term == "provgrp_kin4"] <- "Kasais vs Kinshasa"
+glmresults_5$term[glmresults_5$term == "provgrp_kin5"] <- "Katanga vs Kinshasa"
+glmresults_5$term[glmresults_5$term == "provgrp_kin6"] <- "Orientale vs Kinshasa"
+glmresults_5$term[glmresults_5$term == "provgrp_kin7"] <- "Kivus vs Kinshasa"
+glmresults_5$term[glmresults_5$term == "provgrp_kin8"] <- "Maniema vs Kinshasa"
+glmresults_5$term[glmresults_5$term == "tetabReactive"] <- "Tetanus Ab+ vs -"
+glmresults_5$term[glmresults_5$term == "modstunt1"] <- "Mod-to-severe stunting vs none"
+glmresults_5$term[glmresults_5$term == "modstunt9"] <- "Missing stunting vs none"
+glmresults_5$term[glmresults_5$term == "wast_mod1"] <- "Mod-to-severe wasting vs none"
+glmresults_5$term[glmresults_5$term == "wast_mod9"] <- "Missing wasting vs none"
+table(glmresults_5$term)
 
-view(glmresults)
-write.csv(glmresults, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/glmresults.csv")
 
-ggplot(glmresults, aes(x=term, y=pd100)) +
+glmresults_5 %>% filter(term != "tetabIndeterminate" & term != "Not available") %>% 
+ggplot(aes(x=term, y=pd100)) +
   geom_hline(yintercept=0, linetype='dashed') +
   geom_pointrange(aes(x=fct_rev(fct_reorder(term, desorder)), y=pd100, ymin=pdcilow100, ymax=pdciup100), shape=15, size=0.8, color="black", show.legend=F, fatten=0.2, position=position_dodge2(width = 1.0) ) + 
-  geom_point(shape=15, size=5, aes(color=variable, group=bound, alpha=bound), position=position_dodge2(width = 1.0) , show.legend=T) + #alpha=0.9
+  geom_point(shape=15, size=5, aes(color=variable), position=position_dodge2(width = 1.0) , show.legend=T) + #alpha=0.9
+  #scale_color_manual(values = c('#00429d', '#ffd3bf','#3761ab','#ffa59e', '#5681b9','#f4777f', '#73a2c6', '#dd4c65','#93c4d2','#be214d', '#b9e5dd', '#93003a'))+
+  scale_color_manual(values = c('#00429d','#93003a', '#3761ab','#be214d', '#5681b9','#dd4c65', '#73a2c6', '#f4777f','#93c4d2','#ffa59e', '#b9e5dd','#ffd3bf' ))+
+  # from https://www.vis4.net/palettes/#/13|d|00429d,96ffea,ffffe0|ffffe0,ff005e,93003a|1|1
   #scale_color_brewer(palette = "Dark2")+
   coord_flip() + theme_bw() +
-  scale_alpha_discrete(range = c(0.35, 0.9))+
+  #scale_alpha_discrete(range = c(0.35, 0.9))+
   #scale_x_continuous(trans = "reverse") + 
   labs(x="", y="Unadjusted prevalence difference per 100 kids") + 
   theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
@@ -293,7 +219,15 @@ ggplot(glmresults, aes(x=term, y=pd100)) +
         panel.grid.minor=element_blank()) +
   guides(color="none")
 
-ggsave("./Plots/unajpt_bound.png", width = 9, height = 9)
+ggsave("./Plots/unadjpd_feb.png", width = 9, height = 9)
+
+colnames(glmresults_5)
+glmresults_5e <- glmresults_5 %>% mutate(pdsci = paste(round(pd100,1),' (',round(pdcilow100,1),', ', round(pdciup100,1),')', sep = "")) %>% 
+  select(c("term","pdsci"))
+view(glmresults_5e)
+write.csv(glmresults_5e, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/glmresults5e.csv")
+
+# stopped feb 18------
 
 # for lab meeting, remove bounding
 glmresults %>% filter(bound=="Lower" & variable != "Jaundice" & caretakesubset==0) %>% 
