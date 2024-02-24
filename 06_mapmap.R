@@ -2,6 +2,9 @@
 library(janitor)
 library(tidyverse)
 library(sf)
+library(srvyr)
+library(survey)
+library(patchwork)
 options(survey.lonely.psu="adjust")
 
 designf <-svydesign(ids=elig_kids_whbvres_wt_kr$hv001, strata=elig_kids_whbvres_wt_kr$hv022 , weights=elig_kids_whbvres_wt_kr$both_wt_new,  data=elig_kids_whbvres_wt_kr)
@@ -175,10 +178,33 @@ test2 %>% filter(belowavg == "Prev >1.2%") %>%
         legend.title = element_blank())+
   facet_wrap(~sex, nrow=2)
 
-# maps for other cutoffs--------
-svyby(~prov2015,~hbvresult1, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
-svyby(~prov2015,~hbvresult2, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
-svyby(~prov2015,~hbvresult100, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
+# use age in months to assess over time----
+agemoprov5 <- svyby(~prov2015,~hbvresult5+hc1, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
+agemoprov5 <- agemoprov5 %>% mutate(level = paste0('hbv', level))
+agemo_prov5t <- as.data.frame(t(as.data.frame(agemoprov5))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
+
+agemo_prov5t <- agemo_prov5t %>% mutate(across(-c(level), as.numeric))
+colnames(agemo_prov5t)
+
+
+
+
+agesexprov5t_p <- agesexprov5t %>% mutate(
+  boys0p = 100*(hbv1.Male.0/(hbv0.Male.0 + hbv1.Male.0)),
+  boys1p = 100*(hbv1.Male.1/(hbv0.Male.1 + hbv1.Male.1)),
+  boys2p = 100*(hbv1.Male.2/(hbv0.Male.2 + hbv1.Male.2)),
+  boys3p = 100*(hbv1.Male.3/(hbv0.Male.3 + hbv1.Male.3)),
+  boys4p = 100*(hbv1.Male.4/(hbv0.Male.4 + hbv1.Male.4)),
+  girls0p = 100*(hbv1.Female.0/(hbv0.Female.0 + hbv1.Female.0)),
+  girls1p = 100*(hbv1.Female.1/(hbv0.Female.1 + hbv1.Female.1)),
+  girls2p = 100*(hbv1.Female.2/(hbv0.Female.2 + hbv1.Female.2)),
+  girls3p = 100*(hbv1.Female.3/(hbv0.Female.3 + hbv1.Female.3)),
+  girls4p = 100*(hbv1.Female.4/(hbv0.Female.4 + hbv1.Female.4)))
+
+
+
+
+
 
 # map by age only------
 ageprov5 <- svyby(~prov2015,~hbvresult5+hv105_fromhc1_f, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
@@ -281,7 +307,7 @@ timetrendall <-
 mapagerev + timetrendall + plot_layout(nrow=2, ncol = 1) + plot_annotation(tag_levels = 'A')
 ggsave('./Plots/provsexage_feb.png', width=12, height=6)
 
-## tetanus by province---
+## tetanus by province-------
 provtet5 <- svyby(~prov2015,~hbvresult5+tetab, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
 provtet5 <- provtet5 %>% mutate(level = paste0('hbv', level))
 provtet5t <- as.data.frame(t(as.data.frame(provtet5))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
@@ -348,7 +374,7 @@ ggsave('./Plots/main_maps3.png', width=12, height=4)
 A5 + prov5 + provtet + plot_layout(nrow=3, ncol = 1) + plot_annotation(tag_levels = 'A')
 ggsave('./Plots/main_maps3v.png', width=6, height=12)
 
-## DPT vacc by province---
+## DPT vacc by province---------
 provdpt5 <- svyby(~prov2015,~hbvresult5+dpt_count, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
 provdpt5 <- provdpt5 %>% mutate(level = paste0('hbv', level))
 provdpt5t <- as.data.frame(t(as.data.frame(provdpt5))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
@@ -356,8 +382,7 @@ provdpt5t <- as.data.frame(t(as.data.frame(provdpt5))) %>% rownames_to_column(va
 provdpt5t <- provdpt5t %>% mutate(across(-c(level), as.numeric))
 view(provdpt5t)
 
-summary(provtet5t$pdtet)
-provtet5t <- provtet5t %>% mutate(
+provdpt5t <- provdpt5t %>% mutate(
   Nonreactive_p = 100*(hbv1.Nonreactive/(hbv1.Nonreactive + hbv0.Nonreactive)),
   Reactive_p = 100*(hbv1.Reactive/(hbv1.Reactive + hbv0.Reactive)),
   pdtet = Reactive_p  - Nonreactive_p,
@@ -415,5 +440,15 @@ ggsave('./Plots/main_maps3.png', width=12, height=4)
 A5 + prov5 + provtet + plot_layout(nrow=3, ncol = 1) + plot_annotation(tag_levels = 'A')
 ggsave('./Plots/main_maps3v.png', width=6, height=12)
 
+# tet ab vs dpt
+dptvsab <- svyby(~dpt_doses_f,~tetab, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
+view(dptvsab)
+elig_kids_whbvres_wt_kr %>% filter(tetab != "Indeterminate") %>% group_by(tetab, dpt_doses_f ) %>% summarise(n=n(), count = n() / nrow(.) )
+table(elig_kids_whbvres_wt_kr$dpt_count, elig_kids_whbvres_wt_kr$tetab, useNA = "always")
+table(elig_kids_whbvres_wt_kr$dpt_count, elig_kids_whbvres_wt_kr$hbvresult5, useNA = "always")
 
+# maps for other cutoffs--------
+svyby(~prov2015,~hbvresult1, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
+svyby(~prov2015,~hbvresult2, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
+svyby(~prov2015,~hbvresult100, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
 
