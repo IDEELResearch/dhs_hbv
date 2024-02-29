@@ -6,92 +6,21 @@ library(tableone)
 library(survey)
 library(srvyr)
 # after 01_datacleaning.R has been compiled, use the data frame _____ for analysis
-kids2023 <- k08_nomiss_cc %>% filter(agegrp=="kid")
 
-# get kid file: kidresults (from Stane/Ana testing + Abbott$agegrp=="kid")
-# k08_all has everything before drop of missing
-test <- k08_all %>% filter(agegrp=="kid" & catresult=="reactive") %>% summarise(dbsbarcode,k08orabb)
-kidresults$k08orabb <- "K08 testing"
+# TO DO Feb 2024
+### 1) connect line number of child mother/father
 
-# fill non overlapping columns with NAs
-abbott_trim[setdiff(names(kidresults), names(abbott_trim))] <- NA
-#df2[setdiff(names(df1), names(df2))] <- NA
 
-kidresults <- kidresults %>% mutate(
-  hbvresult = case_when(
-    catresult=="reactive" ~ 1,
-    catresult=="nonreactive" ~ 0,
-    TRUE ~ NA_real_))
-
-test <- rbind(abbott_trim[abbott_trim$agegrp=="kid",], kidresults)
-
-kid_dhs_int <- merge(dhsmeta,test,by="dbsbarcode" )
-
-# 86 not merging with DHS - which
-whichno <- test %>% filter(!(dbsbarcode %in% kid_dhs_int$dbsbarcode))
-# use: kid_dhs_int
-# remove the missing value
-kid_dhs_int <- kid_dhs_int %>% filter(!(is.na(catresult)))
-
-#clean vars for table 1
-class(kid_dhs_int$hv105)
-kid_dhs_int$agenum <- as.numeric(kid_dhs_int$hv105)
-
-kid_dhs_int$hhmem_n <- as.numeric(kid_dhs_int$hv009)
-
-# check kid with age 27
-age27 <- kid_dhs_int %>% filter(hv105=="27")
-age27 %>% reframe(dbsbarcode,k08orabb,hv104,kids,janko_full_kids,pfldh_kids,poselected_kids)
-table(age27$kids)
-
-# lives in household with another positive kid <5
-table(kid_dhs_int$hbvresult, kid_dhs_int$catresult,useNA = "always")
-
-kid_dhs_int$hbvresultlowna <- ifelse(kid_dhs_int$catresult=="low vol",0,kid_dhs_int$hbvresult)
-table(kid_dhs_int$hbvresultlowna, kid_dhs_int$catresult,useNA = "always")
-# make alt variable with low vol samples as 0
-totalpos <- kid_dhs_int %>% group_by(cluster_hh) %>% summarise(totalkidpos = sum(hbvresultlowna))
-totalpos %>% count(totalkidpos)
- 
-kid_dhs_int <- left_join(kid_dhs_int, totalpos, by="cluster_hh")
-kid_dhs_int %>% count(totalkidpos,catresult)
-
-# analyze as categorical since median would be 0
-kid_dhs_int$totalkidpos_f <- as.character(kid_dhs_int$totalkidpos)
-
-#Unweighted Table 1---------------
-numvars <- c("agenum", "hhmem_n") # age, household size, 
-
-catvars <- c("catresult","totalkidpos_f","hv104", "hv024", "hv025","hv270", "hv228", "pfldh_kids") # sex, province, urbal/rural, wealth, children <5 slept under net
-
-allvars <- c("catresult","agenum", "hv104","totalkidpos_f","hhmem_n", "hv024", "hv025","hv270", "hv228", "pfldh_kids") #hv104=sex, hv024=prov, hv025=urban(1)/rural(2), hv270 wealth,hv228(kids<5 slept under net)
-
-#Export table 1
-k08_int_2023 <- CreateTableOne(vars=allvars, factorVars = catvars,  data=kid_dhs_int, strata ="catresult", addOverall = TRUE, test = TRUE) # kruskal.test
-#print to output
-print(k08_int_2023, nonnormal = allvars , exact = allvars ,quote = FALSE, noSpaces = TRUE, varLabels = T, showAllLevels = TRUE)
-# save as object to export
-k08_int_2023 <- print(k08_int_2023, nonnormal = allvars , exact = allvars ,quote = FALSE, noSpaces = TRUE, varLabels = T  ,printToggle = FALSE, showAllLevels = TRUE)
-## Save to a CSV file
-write.csv(k08_int_2023, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/k08_int_2023.csv")
-
-# additional variables
-catvars <- c("catresult","shnprovin")
-
-allvars <- c("catresult","shnprovin")
-
-addmargins(table( kid_dhs_int$shnprovin, kid_dhs_int$catresult,useNA = "always"))
-
-table(kid_dhs_int$sh310a)
-table(kid_dhs_int$catresult)
-
-#JAN2024------------
-table(elig_kids_whbvres_wt_kr$v480, elig_kids_whbvres_wt_kr$prov2015)
 #Weighted children------------------------
 # add weight variable
 # kid_dhs_int$hh_weight <- as.numeric(kid_dhs_int$hv005)/1000000
 # elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate_at(c('poskids'), as.factor)
 # elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate_at(c('v480'), as.factor)
+
+elig_kids_whbvres_wt_kr %>% filter(hbvresult1==1 & hbvresult5==0) %>% group_by(prov2015, hv024, sex) %>% summarise(n=n(), nsum=nrow(.) )
+elig_kids_whbvres_wt_kr %>% filter(hbvresult5==1 & hbvresult100==0) %>% group_by(prov2015, hv024, sex) %>% summarise(n=n(), nsum=nrow(.) )
+elig_kids_whbvres_wt_kr %>% filter(hbvresult5==1 & hbvresult100==0) %>% group_by(prov2015, hv024, sex) %>% summarise(n=n(), nsum=nrow(.) )
+elig_kids_whbvres_wt_kr %>% group_by(hv101) %>% count() %>% print(n=Inf)
 
 # go through 01_datacleaning_rev.R) to obtain elig_kids_whbvres_wt_kr
 # make survey design object
@@ -263,7 +192,7 @@ modstu_by <- as.data.frame(svyby(~hbvresult5,~modstunt_f, designf_dhs2, svycipro
 dpt_dos_by <- as.data.frame(svyby(~hbvresult5,~dpt_doses_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("dpt_doses_f"))
 inje_by <- as.data.frame(svyby(~hbvresult5,~injec_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("injec_f"))
 beat_by <- as.data.frame(svyby(~hbvresult5,~beat_f, designf_dhs2, svyciprop, vartype="ci",na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("beat_f"))
-view(prov2015_by)
+view(wealth_by)
 # combine
 all_by <- dplyr::bind_rows(list(age_by, sex_by, reltoheadhh_by, urbru_by, location_by, prov2015_by, wealth_by, pfmal_by, shteta_by, anem_by, modstu_by,dpt_dos_by, inje_by, beat_by)) %>% 
   filter(!grepl("se\\.", covname) & !grepl("hbvresult5", covname))
@@ -287,12 +216,12 @@ modstu_by <-  as.data.frame(t(as.data.frame(survtable("modstunt_f")))) %>% rowna
 dpt_dos_by <-  as.data.frame(t(as.data.frame(survtable("dpt_doses_f")))) %>% rownames_to_column(var = "covname")
 inje_by <-  as.data.frame(t(as.data.frame(survtable("injec_f")))) %>% rownames_to_column(var = "covname")
 beat_by <-  as.data.frame(t(as.data.frame(survtable("beat_f")))) %>% rownames_to_column(var = "covname")
-view(anem_by)
+view(wealth_by)
 svyby(~pfmalaria,~hbvresult5, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
 
 # survtable("poskids") # since there are 0 counts by design, need to run outside the function
 poskids_by <- as.data.frame(svyby(~hbvresult5,~poskids, designf_dhs2, svyciprop, na.rm=T, survey.lonely.psu="adjust")) %>% rownames_to_column(var = "covname") %>% select(-one_of("poskids"))
-view(poskids_by)
+view(wealth_by)
 
 ## combine cat data----------
 all_by <- dplyr::bind_rows(list(age_by, sex_by, reltoheadhh_by, urbru_by, location_by, prov2015_by, wealth_by, pfmal_by, shteta_by, anem_by, modstu_by,dpt_dos_by, inje_by, beat_by)) %>% 
