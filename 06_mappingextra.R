@@ -203,6 +203,7 @@ library(ggrepel)
 my_purd = brewer.pal(n = 9, "PuRd")[3:9] #there are 9, I exluded the two lighter hues
 my_greens = c("#EAF7E6","#BBE3B4","#41ae76", "#238b45","#00441b") #there are 9, I exluded the two lighter hues
 my_gregra = c("gray47","#BBE3B4","#41ae76", "#238b45","#00441b") #there are 9, I exluded the two lighter hues
+my_gregra6 = c("#F7F7F7","#EAF7E6",'#afddb3', '#72c18d', '#39a468', '#10632f', '#00441b') #there are 9, I exluded the two lighter hues
 
 A5 <- 
   ggplot() + 
@@ -218,7 +219,7 @@ A5 <-
     geom_sf_text(data=drccities, aes(label = name), size = 3, fontface = "bold")+
     labs(color='', shape = '') + 
   scale_shape_discrete(labels = c("Original","Imputed"))+
-  theme_bw(base_size=14) + 
+  theme_bw(base_size=10) + 
   scale_color_manual(values = my_gregra)+
     #scale_color_brewer(palette = "RdGy", direction = -1) + #YlOrRd
   scale_x_continuous(limits=c(12,31)) + 
@@ -230,7 +231,7 @@ A5 <-
         axis.ticks=element_blank(), 
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
-        legend.text = element_text(size = 8),
+        #legend.text = element_text(size = 8),
         panel.background = element_rect(fill="#daeff8", color=NA))
 #        legend.position = c(.29, .16), # if want legend inside map outline
 #        legend.background = element_blank()
@@ -343,12 +344,12 @@ dptmap <-
   geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
   geom_sf(data=dpt_points, aes(color=avg_pentdos), alpha=0.8) + 
-  labs(color='% in cluster') + 
+  labs(color='') + 
   theme_bw(base_size=14) + 
   scale_color_distiller(palette = "RdYlBu", direction = 1) + #YlOrRd
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
-  ggtitle("Indeterminant tetanus serology")+
+  ggtitle("Average DPT doses")+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
         axis.ticks=element_blank(), 
@@ -361,52 +362,7 @@ dptmap
 ggsave('./Plots/dpt_map.png', width=15, height=6)
 
 ## Tetanus Ab------------
-# tet lower is indeterminants as not reactive (lower bound)
-tetlow <- 
-  ggplot() + 
-  geom_sf(data=admin0, fill="snow3", color="snow4") +
-  geom_sf(data=DRC, fill="snow2") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=tetcovlower), alpha=0.8) + 
-  labs(color='% in cluster') + 
-  theme_bw(base_size=14) + 
-  scale_color_distiller(palette = 'Spectral', direction=1) + 
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  ggtitle("Children ≤5 with detectable Tetanus antibodies (lower bound)")+
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA),
-        legend.position = c(.29, .16),
-        legend.background = element_blank())
-tetlow
 
-tetupp <- 
-  ggplot() + 
-  geom_sf(data=admin0, fill="snow3", color="snow4") +
-  geom_sf(data=DRC, fill="snow2") +
-  geom_sf(data=DRC, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=drcprov, fill=NA, color="tan4", size=0.75) + 
-  geom_sf(data=output_points, aes(color=tetcovupper), alpha=0.8) + 
-  labs(color='% in cluster') + 
-  theme_bw(base_size=14) + 
-  scale_color_distiller(palette = 'Spectral', direction=1) + 
-  scale_x_continuous(limits=c(12,31)) + 
-  scale_y_continuous(limits=c(-13.5,5.4)) + 
-  ggtitle("Children ≤5 with detectable Tetanus antibodies (upper bound)")+
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        axis.ticks=element_blank(), 
-        axis.text.x=element_blank(), 
-        axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA),
-        legend.position = c(.29, .16),
-        legend.background = element_blank())
-tetupp
 
 
 #Kriging-------------
@@ -683,50 +639,102 @@ drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.s
 library(survey)
 library(srvyr)
 library(readxl)
-#df5 <- # figure out how to transpose 
-svyby(~prov2015,~hbvresult5, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
-svyby(~prov2015,~hbvresult1, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
-svyby(~prov2015,~hbvresult2, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
-svyby(~prov2015,~hbvresult100, designf_dhs2, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% clipr::write_clip()
+mainprov5 <- svyby(~prov2015,~hbvresult5, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
+mainprov5 <- mainprov5 %>% mutate(level = paste0('hbv5.', level))
+mainprov5t <- as.data.frame(t(as.data.frame(mainprov5))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
+mainprov5t <- mainprov5t %>% mutate(across(-c(level), as.numeric))
+view(mainprov5t)
 
-wtdctskids <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx",
-                         sheet = "feb17 form")
+mainprov1 <- svyby(~prov2015,~hbvresult1, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
+mainprov1 <- mainprov1 %>% mutate(level = paste0('hbv1.', level))
+mainprov1t <- as.data.frame(t(as.data.frame(mainprov1))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
+mainprov1t <- mainprov1t %>% mutate(across(-c(level), as.numeric))
 
-wtdctskids$total <- wtdctskids$hbvpos5 + wtdctskids$hbvneg5
-wtdctskids$prev5 <- (wtdctskids$hbvpos5/wtdctskids$total)*100
-wtdctskids$prev1 <- (wtdctskids$hbvpos1/wtdctskids$total)*100
-wtdctskids$prev2 <- (wtdctskids$hbvpos2/wtdctskids$total)*100
-wtdctskids$prev100 <- (wtdctskids$hbvpos100/wtdctskids$total)*100
-view(output_df)
+mainprov2 <- svyby(~prov2015,~hbvresult2, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
+mainprov2 <- mainprov2 %>% mutate(level = paste0('hbv2.', level))
+mainprov2t <- as.data.frame(t(as.data.frame(mainprov2))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
+mainprov2t <- mainprov2t %>% mutate(across(-c(level), as.numeric))
 
-## WHAT ARE PROV NAMES - MAKE SURE THEY MATCH THE DRCPROV OBJECT
-wtdctskids$ADM1_NAME <- toupper(wtdctskids$provnamesimp)
-drcprov_hbvkids <- left_join(drcprov,wtdctskids, by="ADM1_NAME")
-view(drcprov_hbvkids)
+mainprov100 <- svyby(~prov2015,~hbvresult100, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
+mainprov100 <- mainprov100 %>% mutate(level = paste0('hbv100.', level))
+mainprov100t <- as.data.frame(t(as.data.frame(mainprov100))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
+mainprov100t <- mainprov100t %>% mutate(across(-c(level), as.numeric))
 
-provcentrs <- st_centroid(drcprov_agesex)
-provcentrs <- st_sf(st_point_on_surface(drcprov_agesex)) %>% distinct(geometry, hyphen)
-coords <- st_coordinates(provcentrs)
+mainprovs <- left_join(mainprov5t, mainprov1t, by='level') %>%
+  left_join(., mainprov2t, by='level') %>% left_join(., mainprov100t, by = 'level')
 
-colab <- cbind(provcentrs, coords)
-view(colab)
+view(mainprovs)
 
+mainprovs <- mainprovs %>% mutate(
+  prev5 = 100*(hbv5.1/(hbv5.0 + hbv5.1)),
+  prev1 = 100*(hbv1.1/(hbv1.0 + hbv1.1)),#,
+  prev2 = 100*(hbv2.1/(hbv2.0 + hbv2.1)),#,
+  prev100 = 100*(hbv100.1/(hbv100.0 + hbv100.1)))
+mainprovs$hyphen <- gsub("prov2015", "", mainprovs$level)
+
+mainprovs_m <- mainprovs %>% select(c("hyphen", starts_with("prev"))) %>% melt()
+view(mainprovs_m)
+table(mainprovs_m$value)
+mainprovs_m <- mainprovs_m %>% mutate(value_g = case_when(
+    value == 0 ~ 0,
+    value >0 & value <0.5 ~ 1,
+    value >0.5 & value <1.5 ~ 2,
+    value >1.5 & value <2.5 ~ 3,
+    value >2.5 & value <3.5 ~ 4,
+    value >3.5 & value <4.5 ~ 5,
+    value >4.5 ~ 6),
+  value_gf = factor(value_g,
+                    levels = c(0,1,2,3,4,5,6),
+                    labels = c("0%", "<1%","1%","2%", "3%","4%","5+%")))
+
+drcprov_sens <- left_join( drcprov[,c("hyphen", "geometry")], mainprovs_m, by="hyphen")
+
+#prov_all <-
+ggplot()+
+  geom_sf(data=admin0, fill="snow3", color="snow4") +
+  geom_sf(data=drcprov_sens,  mapping=aes(fill=value))+
+  scale_fill_distiller(palette = 'Greens', direction = 1) + #  YlGn
+  theme_bw(base_size=14) + 
+  geom_sf_text(data= drcprov_sens[drcprov_sens$hyphen!="Kasai-Oriental" & drcprov_sens$hyphen!="Kasai-Central" &drcprov_sens$hyphen!="Tshopo" &drcprov_sens$hyphen!="Lomami" ,], 
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 2) + #fontface = "bold"
+  geom_sf_text(data= drcprov_sens[drcprov_sens$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_sens[drcprov_sens$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_sens[drcprov_sens$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_sens[drcprov_sens$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 2) + #, fontface = "bold"
+  #  geom_text_repel(data= colab, mapping=aes(x = X, y = Y, label = hyphen),
+  #               size = 3, fontface = "bold"  ) +
+  scale_x_continuous(limits=c(12,31)) + 
+  scale_y_continuous(limits=c(-13.5,5.4)) + 
+  labs(fill = "HBsAg prevalence (%)")+
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.title = element_blank(),
+        axis.ticks=element_blank(), 
+        axis.text.x=element_blank(), 
+        axis.text.y=element_blank(),
+        panel.background = element_rect(fill="#daeff8", color=NA)#,
+        #legend.title = element_blank()
+        )+
+  facet_wrap(~factor(variable, levels = c("prev1","prev2","prev5", "prev100"), labels = c("S/CO 1", "S/CO 2", "S/CO 5 (main analysis)", "S/CO 100")),
+             nrow = 4, ncol = 1)
+ggsave("./Plots/prov_all_vert.png", width = 6, height = 12)
+
+# original
 prov5 <-
   ggplot()+
   geom_sf(data=admin0, fill="snow3", color="snow4") +
-  geom_sf(data=drcprov_hbvkids,  mapping=aes(fill=prev5))+
-  #scale_fill_manual(values = my_greens)+
-  scale_fill_distiller(palette = 'Greens', direction = 1) + #  YlGn
+  geom_sf(data=drcprov_sens[drcprov_sens$variable=="prev5",],  mapping=aes(fill=value_gf))+
+  scale_fill_manual(values = my_gregra6)+
+  #scale_fill_distiller(palette = 'Greens', direction = 1) + #  YlGn
 #  scale_fill_distiller(palette = 'Spectral') +
-  theme_bw(base_size=14) + 
+  theme_bw(base_size=10) + 
   geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen!="Kasai-Oriental" & drcprov_agesex$hyphen!="Kasai-Central" &drcprov_agesex$hyphen!="Tshopo" &drcprov_agesex$hyphen!="Lomami" ,], 
-               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 2) + #fontface = "bold"
-  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 2) + #, fontface = "bold"
-  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 2) + #, fontface = "bold"
-  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 2) + #, fontface = "bold"
-  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 2) + #, fontface = "bold"
-  #  geom_text_repel(data= colab, mapping=aes(x = X, y = Y, label = hyphen),
-#               size = 3, fontface = "bold"  ) +
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 3) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 3) + #,, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 3) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 3) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 3) + #, fontface = "bold"
+  labs(fill="HBsAg prevalence")+
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   theme(panel.grid.major = element_blank(), 
@@ -736,7 +744,9 @@ prov5 <-
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
         panel.background = element_rect(fill="#daeff8", color=NA),
-        legend.title = element_blank())
+        #legend.text = element_text(size = 8),
+        #legend.title = element_text(size = 8)
+        )
 prov5
 ggsave("./Plots/kidprev_wtdall_f.png", width = 6, height = 6)
 
@@ -757,6 +767,12 @@ prov5_sup <-
   geom_sf(data=admin0, fill="snow2", color="snow3") +
   geom_sf(data=drcprov_hbvkids,  mapping=aes(fill=prev5))+
   scale_fill_distiller(palette = 'Greens', direction = 1) +
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen!="Kasai-Oriental" & drcprov_agesex$hyphen!="Kasai-Central" &drcprov_agesex$hyphen!="Tshopo" &drcprov_agesex$hyphen!="Lomami" ,], 
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 2) + #fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 2) + #, fontface = "bold"
   #  scale_fill_distiller(palette = 'Spectral') +
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
@@ -773,6 +789,12 @@ prov1 <-
   geom_sf(data=admin0, fill="snow2", color="snow3") +
   geom_sf(data=drcprov_hbvkids,  mapping=aes(fill=prev1))+
   scale_fill_distiller(palette = 'Greens', direction = 1) +
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen!="Kasai-Oriental" & drcprov_agesex$hyphen!="Kasai-Central" &drcprov_agesex$hyphen!="Tshopo" &drcprov_agesex$hyphen!="Lomami" ,], 
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 2) + #fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 2) + #, fontface = "bold"
   #  scale_fill_distiller(palette = 'Spectral') +
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
@@ -789,6 +811,12 @@ prov2 <-
   geom_sf(data=admin0, fill="snow2", color="snow3") +
   geom_sf(data=drcprov_hbvkids,  mapping=aes(fill=prev2))+
   scale_fill_distiller(palette = 'Greens', direction = 1) +
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen!="Kasai-Oriental" & drcprov_agesex$hyphen!="Kasai-Central" &drcprov_agesex$hyphen!="Tshopo" &drcprov_agesex$hyphen!="Lomami" ,], 
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 2) + #fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 2) + #, fontface = "bold"
   #  scale_fill_distiller(palette = 'Spectral') +
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
@@ -805,6 +833,12 @@ prov100 <-
   geom_sf(data=admin0, fill="snow2", color="snow3") +
   geom_sf(data=drcprov_hbvkids,  mapping=aes(fill=prev100))+
   scale_fill_distiller(palette = 'Greens', direction = 1) +
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen!="Kasai-Oriental" & drcprov_agesex$hyphen!="Kasai-Central" &drcprov_agesex$hyphen!="Tshopo" &drcprov_agesex$hyphen!="Lomami" ,], 
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 2) + #fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 2) + #, fontface = "bold"
+  geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 2) + #, fontface = "bold"
   #  scale_fill_distiller(palette = 'Spectral') +
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 

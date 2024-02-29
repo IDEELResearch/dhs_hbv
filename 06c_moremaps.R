@@ -1,3 +1,5 @@
+library(tidyverse)
+options(scipen = 999)
 # dataset agemoprov5 from 06_mapmap.R
 agemoprov5 <- svyby(~prov2015,~hbvresult5+hc1, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
 agemoprov5 <- agemoprov5 %>% mutate(level = paste0('hbv', level))
@@ -126,14 +128,14 @@ view(df_with_proportions)
 
 k1 <- df_with_proportions %>% select(c(level, starts_with("proportion")))
 view(k1)
-library(reshape)
+library(reshape2)
 k2 <- melt(k1)
 view(k2)
 
 k2 <- k2 %>% mutate(  age = str_extract(variable, '[0-9]+') %>% as.numeric(),
                       birmo = 60 - age)
-view(k3)
-provprev <- test %>% group_by(hyphen) %>% summarise(avgprev = mean(value)) %>% mutate(belowavg = case_when(avgprev>1.2 ~ "Prev >1.2%",
+view(k2)
+provprev <- k2 %>% group_by(hyphen) %>% summarise(avgprev = mean(value)) %>% mutate(belowavg = case_when(avgprev>1.2 ~ "Prev >1.2%",
                                                                                                            avgprev <=1.2 ~ "Avg/below 1.2%"))
 k2 <- k2 %>% mutate(hyphen = str_split_fixed(level, "prov2015", 2)[,2])
 
@@ -162,11 +164,12 @@ k3 <- left_join(k3, provmatch[,c("oldprov", "hyphen")], by = "hyphen")
 k3 %>% 
   ggplot(aes(x=birmo, y = value, color = fct_reorder(hyphen, desc(avgprev))))+
   geom_line()+
-  labs(y="HBsAg prevalence", x="Birth cohort")+
+  labs(y="HBsAg prevalence", x="Age in months")+
   scale_color_manual(values = c('#93003a', '#a70842', '#b81b4a', '#c82d54', '#d5405e', '#e15268', '#eb6574', '#f4777f', '#fb8a8c', '#ff9e99', '#ffb3a7', '#ffc6b6',  '#d8f6e1', '#c0eade', '#addcda', '#9dced6', '#8ebfd1', '#80b1cc', '#73a2c6', '#6694c1', '#5a86bb', '#4e78b5', '#406aaf', '#325da9', '#204fa3', '#00429d'))+
   theme(panel.background = element_blank(),
         legend.title = element_blank())+
-  facet_wrap(~reorder(oldprov, -avgprev))
+  ggtitle("HBsAg by age in months by province")+
+  facet_wrap(~reorder(oldprov, -avgprev), nrow = 2)
 ggsave('./Plots/tang/6-59prev_byprov.png', width=12, height=6)
 
 # consider rolling average over a few months-------
@@ -181,15 +184,21 @@ k4 <- k3 %>%
   dplyr::ungroup()
 view(k4)
 
+threemorolling<-
 k4 %>% 
-  ggplot(aes(x=birmo, y = prev_3mo, color = fct_reorder(hyphen, desc(avgprev))))+
+  ggplot(aes(x=birmo, y = 100*prev_3mo, color = fct_reorder(hyphen, desc(avgprev))))+
   geom_line()+
-  labs(y="HBsAg prevalence", x="Birth cohort")+
+  labs(y="HBsAg prevalence (%)", x="Age in months")+
   scale_color_manual(values = c('#93003a', '#a70842', '#b81b4a', '#c82d54', '#d5405e', '#e15268', '#eb6574', '#f4777f', '#fb8a8c', '#ff9e99', '#ffb3a7', '#ffc6b6',  '#d8f6e1', '#c0eade', '#addcda', '#9dced6', '#8ebfd1', '#80b1cc', '#73a2c6', '#6694c1', '#5a86bb', '#4e78b5', '#406aaf', '#325da9', '#204fa3', '#00429d'))+
 #  scale_color_manual(values = c('#93003a', '#b81b4a', '#d5405e', '#eb6574', '#fb8a8c', '#ffb3a7', '#ffdac4', '#c0eade', '#9dced6', '#80b1cc', '#6694c1', '#4e78b5', '#325da9', '#00429d'))+
+  scale_x_reverse(breaks = seq(12, 48, by = 12))+
+  #scale_x_continuous(breaks = seq(12, 48, by = 12))+
   theme(panel.background = element_blank(),
-        legend.title = element_blank())+
+        legend.title = element_blank(),
+        legend.text = element_text(size = 12))+
+  ggtitle("Rolling average of HBsAg prevalence by province using three month age groupings, oldest to youngest")+
   facet_wrap(~reorder(oldprov, -avgprev))
+threemorolling
 ggsave('./Plots/tang/3moavgprev_byprov.png', width=12, height=6)
 
 #for hbvreuslt1---------
@@ -292,9 +301,9 @@ k4 <- k3 %>%
 view(k4)
 
 k4 %>% 
-  ggplot(aes(x=birmo, y = prev_3mo, color = fct_reorder(hyphen, desc(avgprev))))+
+  ggplot(aes(x=birmo, y = prev_9mo, color = fct_reorder(hyphen, desc(avgprev))))+ # 3,6,9,12 rolling averages: prev_3mo, prev_6mo, prev_9mo, prev_12mo
   geom_line()+
-  labs(y="HBsAg prevalence", x="Birth cohort")+
+  labs(y="HBsAg prevalence", x="Age in months")+
   scale_color_manual(values = c('#93003a', '#a70842', '#b81b4a', '#c82d54', '#d5405e', '#e15268', '#eb6574', '#f4777f', '#fb8a8c', '#ff9e99', '#ffb3a7', '#ffc6b6',  '#d8f6e1', '#c0eade', '#addcda', '#9dced6', '#8ebfd1', '#80b1cc', '#73a2c6', '#6694c1', '#5a86bb', '#4e78b5', '#406aaf', '#325da9', '#204fa3', '#00429d'))+
   #  scale_color_manual(values = c('#93003a', '#b81b4a', '#d5405e', '#eb6574', '#fb8a8c', '#ffb3a7', '#ffdac4', '#c0eade', '#9dced6', '#80b1cc', '#6694c1', '#4e78b5', '#325da9', '#00429d'))+
   theme(panel.background = element_blank(),
