@@ -3,15 +3,16 @@
 # Load packages---------
 library(tidyverse)
 library(foreign)
+library(here)
 #Codebooks info------
 # from DHS website, download CDKR61FL.DO and CDPR61FL.DO (or the DO files for other datasets of interest). Open these in a text editor (DO files are executable Stata code files), and control-F search for the variable labels and values
 
 #Children data----------
-CDOB61FL <- read.dta("/Users/camillem/Documents/GitHub/dhs_hbv/Data/CDOB61FL/POLIO RESULTS CDC 12MAY2018.DTA", convert.factors = FALSE)
-cdpr61dt <- read.dta("/Users/camillem/Documents/GitHub/dhs_hbv/Data/CDPR61DT/CDPR61FL.DTA", convert.factors = FALSE)
+CDOB61FL <- read.dta(here("Data", "CDOB61FL", "POLIO RESULTS CDC 12MAY2018.DTA"), convert.factors = FALSE)
+cdpr61dt <- read.dta(here("Data","CDPR61DT", "CDPR61FL.DTA"), convert.factors = FALSE)
 
 #kids recode file with additional questions for a subset of children
-d_k_or <- read.dta("/Users/camillem/Documents/GitHub/dhs_hbv/Data/CDKR61DT/CDKR61FL.DTA", convert.factors = FALSE)
+d_k_or <- read.dta(here("Data","CDKR61DT","CDKR61FL.DTA"), convert.factors = FALSE)
 
 # create unique ID for households (need to combine cluster and hh number)
 dhsmeta$cluster_hh <- paste(dhsmeta$hv001, dhsmeta$hv002,sep = "_")
@@ -397,6 +398,9 @@ elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate(
     dpt_count==3 ~ 2, # reported or noted as received for all
     dpt_count==1 | dpt_count==2  ~ 1, # received 1 or 2 doses
     dpt_count==0 ~ 0), # received none
+  dpt_any = case_when(
+    dpt_count == 0 ~ 0, # no doses
+    dpt_count > 0 ~ 1), # any doses
 #2.  injections: h15[x] vars - very few responses so skipping; using v477 (count of injections received)
   injec = case_when(
     v477==0 ~ 0, # no injections in last 12 mo
@@ -412,6 +416,7 @@ beat = case_when(
 elig_kids_whbvres_wt_kr %>% group_by(dpt1, dpt2, dpt3, dpt_count, dpt_doses) %>% count()
 elig_kids_whbvres_wt_kr %>% group_by(v477, injec) %>% count()
 elig_kids_whbvres_wt_kr %>% group_by(v744a, v744b, v744c, v744d, v744e, beat) %>% count() %>% print(n=Inf)
+elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate(syringe = case_when(is.na(v480) ~ 0, !is.na(v480) ~ 1))
 
 # labels : relationship to head of hh
 elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% dplyr::mutate(
@@ -460,6 +465,9 @@ elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% dplyr::mutate(
       dpt_doses == 1 ~ "Series incomplete",
       dpt_doses == 2 ~ "Series completed",
       is.na(dpt_doses) ~ "Not available"),
+    dpt_any_f = factor(dpt_any,
+                       levels = c(0,1),
+                       labels = c("No doses", "Series initiated")),
     injec_f = case_when(
       injec == 0 ~ "None",
       injec == 1 ~ "1-12",
