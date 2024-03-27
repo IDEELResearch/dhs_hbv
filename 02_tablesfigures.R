@@ -63,6 +63,7 @@ survmean <- function(var){
 ## cont data, overall----------
 ## vars: hv105_fromhc1 (age in years from months var),  hv009 (number of household members), hv014 (number of children in hh (de jure))
 survmean_all("hv105_fromhc1")
+survmean_all("hc1")
 survmean_all("hv009") 
 age_av <- as.data.frame(survmean_all("hv105_fromhc1")) %>% rownames_to_column(var = "cov")  %>%  
   mutate(levels = "Age, mean (SD)") %>% rename(se = hv105_fromhc1)
