@@ -1,5 +1,9 @@
 # 01_datacleaning_rev.R
 
+# renv setup--------
+#install.packages("renv")
+renv::init()
+
 # Load packages---------
 library(tidyverse)
 library(foreign)
