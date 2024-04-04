@@ -115,8 +115,8 @@ summary(beat)
 confint(beat)
 
 # as function----
-vars <- c("hv105_fromhc1_f", 'sex','reltoheadhh_simp', 'urbanrural','location','wealth','anemia_f',"modstunt", 'pfmalaria','tetab', "dpt_doses_f", 'injec','beat')
-# run separately: "injec_f", 'v480', provgrp_kin_l, ,  "beat_f"
+vars <- c("hv105_fromhc1_f", 'sex','reltoheadhh_simp', 'urbanrural','location','wealth','anemia_f',"modstunt", 'pfmalaria','tetab', "dpt_doses_f", "injec_f", "beat_f")
+# run separately: "injec_f", 'v480', provgrp_kin_l, ,
 
 bivs_5 <- function(var){ # glm function
   m <- svyglm(as.formula(paste0('hbvresult5 ~', var)), designf_dhs2, family=quasibinomial("identity"))
@@ -159,33 +159,42 @@ glmresults_5 <- glmresults_5  %>%  mutate(desorder=row_number())
 
 table(glmresults_5$term)
 view(glmresults_5)
+#glmresults_5 <- glmresults_5 %>% mutate(setorder = )
 
-glmresults_5$term[glmresults_5$term == "beat1"] <- "Beating justified vs not"
-#glmresults_5$term[glmresults_5$term == "dpt_count"] <- "# of DPT doses (continuous)"
-glmresults_5$term[glmresults_5$term == "dpt_doses_fNot available"] <- "Not available"
-glmresults_5$term[glmresults_5$term == "dpt_doses_fSeries incomplete"] <- "DPT initiated (1-2 doses) vs not started (0 doses)"
-glmresults_5$term[glmresults_5$term == "dpt_doses_fSeries completed"] <- "DPT series complete (3 doses) vs not started (0 doses)"
-glmresults_5$term[glmresults_5$term == "urbanruralRural"] <- "Rural vs urban"
-glmresults_5$term[glmresults_5$term == "locationSmall city"] <- "Small city vs capital"
-glmresults_5$term[glmresults_5$term == "locationTown"] <- "Town vs capital"
-glmresults_5$term[glmresults_5$term == "locationCountryside"] <- "Countryside vs capital"
-glmresults_5$term[glmresults_5$term == "reltoheadhh_simpGrandchild"] <- "Grandchild vs child"
-glmresults_5$term[glmresults_5$term == "reltoheadhh_simpOther"] <- "Other vs child"
-#glmresults_5$term[glmresults_5$term == "hv1042"] <- "Female vs male"
-glmresults_5$term[glmresults_5$term == "sexMale"] <- "Male vs Female"
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f1"] <- "1 year vs <1 year"
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f2"] <- "2 years vs <1 year"
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f3"] <- "3 years vs <1 year"
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f4"] <- "4 years vs <1 year"
-glmresults_5$term[glmresults_5$term == "wealthPoorer"] <- "Poorer vs poorest"
-glmresults_5$term[glmresults_5$term == "wealthMiddle"] <- "Middle vs poorest"
-glmresults_5$term[glmresults_5$term == "wealthRicher"] <- "Richer vs poorest"
-glmresults_5$term[glmresults_5$term == "wealthRichest"] <- "Richest vs poorest"
+glmresults_5$term[glmresults_5$term == "sexMale"] <- "Male vs Female"
+#glmresults_5$term[glmresults_5$term == "hv1042"] <- "Female vs male"
+glmresults_5$term[glmresults_5$term == "reltoheadhh_simpGrandchild"] <- "Grandchild vs child"
+glmresults_5$term[glmresults_5$term == "reltoheadhh_simpOther"] <- "Other vs child"
+
+glmresults_5$term[glmresults_5$term == "tetabReactive"] <- "Tetanus Ab+ vs -"
+glmresults_5$term[glmresults_5$term == "dpt_doses_fNot available"] <- "Not available"
+glmresults_5$term[glmresults_5$term == "dpt_doses_fSeries incomplete"] <- "DPT initiated (1-2 doses) vs not started (0 doses)"
+glmresults_5$term[glmresults_5$term == "dpt_doses_fSeries completed"] <- "DPT series complete (3 doses) vs not started (0 doses)"
 glmresults_5$term[glmresults_5$term == "injec1"] <- "1-12 injections vs none"
 glmresults_5$term[glmresults_5$term == "injec2"] <- "12-24 injections vs none"
 glmresults_5$term[glmresults_5$term == "injec3"] <- "≥25 injections vs none"
 glmresults_5$term[glmresults_5$term == "anemia_fModerate-to-severe"] <- "Anemia: moderate-to-severe vs mild-to-none"
 glmresults_5$term[glmresults_5$term == "pfmalariaPf-positive"] <- "Pf malaria+ vs -"
+#glmresults_5$term[glmresults_5$term == "dpt_count"] <- "# of DPT doses (continuous)"
+glmresults_5$term[glmresults_5$term == "modstunt1"] <- "Mod-to-severe stunting vs none"
+glmresults_5$term[glmresults_5$term == "modstunt9"] <- "Missing stunting vs none"
+glmresults_5$term[glmresults_5$term == "wast_mod1"] <- "Mod-to-severe wasting vs none"
+glmresults_5$term[glmresults_5$term == "wast_mod9"] <- "Missing wasting vs none"
+
+glmresults_5$term[glmresults_5$term == "urbanruralRural"] <- "Rural vs urban"
+glmresults_5$term[glmresults_5$term == "locationSmall city"] <- "Small city vs capital"
+glmresults_5$term[glmresults_5$term == "locationTown"] <- "Town vs capital"
+glmresults_5$term[glmresults_5$term == "locationCountryside"] <- "Countryside vs capital"
+glmresults_5$term[glmresults_5$term == "wealthPoorer"] <- "Poorer vs poorest"
+glmresults_5$term[glmresults_5$term == "wealthMiddle"] <- "Middle vs poorest"
+glmresults_5$term[glmresults_5$term == "wealthRicher"] <- "Richer vs poorest"
+glmresults_5$term[glmresults_5$term == "wealthRichest"] <- "Richest vs poorest"
+glmresults_5$term[glmresults_5$term == "beat1"] <- "Beating justified vs not"
+
 glmresults_5$term[glmresults_5$term == "provgrp_kin2"] <- "Kongo Central/Bandundu vs Kinshasa"
 glmresults_5$term[glmresults_5$term == "provgrp_kin3"] <- "Equateur vs Kinshasa"
 glmresults_5$term[glmresults_5$term == "provgrp_kin4"] <- "Kasais vs Kinshasa"
@@ -193,27 +202,23 @@ glmresults_5$term[glmresults_5$term == "provgrp_kin5"] <- "Katanga vs Kinshasa"
 glmresults_5$term[glmresults_5$term == "provgrp_kin6"] <- "Orientale vs Kinshasa"
 glmresults_5$term[glmresults_5$term == "provgrp_kin7"] <- "Kivus vs Kinshasa"
 glmresults_5$term[glmresults_5$term == "provgrp_kin8"] <- "Maniema vs Kinshasa"
-glmresults_5$term[glmresults_5$term == "tetabReactive"] <- "Tetanus Ab+ vs -"
-glmresults_5$term[glmresults_5$term == "modstunt1"] <- "Mod-to-severe stunting vs none"
-glmresults_5$term[glmresults_5$term == "modstunt9"] <- "Missing stunting vs none"
-glmresults_5$term[glmresults_5$term == "wast_mod1"] <- "Mod-to-severe wasting vs none"
-glmresults_5$term[glmresults_5$term == "wast_mod9"] <- "Missing wasting vs none"
 table(glmresults_5$term)
-
+view(glmresults_5)
 
 glmresults_5 %>% filter(term != "tetabIndeterminate" & term != "Not available") %>% 
 ggplot(aes(x=term, y=pd100)) +
   geom_hline(yintercept=0, linetype='dashed') +
   geom_pointrange(aes(x=fct_rev(fct_reorder(term, desorder)), y=pd100, ymin=pdcilow100, ymax=pdciup100), shape=15, size=0.8, color="black", show.legend=F, fatten=0.2, position=position_dodge2(width = 1.0) ) + 
-  geom_point(shape=15, size=5, aes(color=variable), position=position_dodge2(width = 1.0) , show.legend=T) + #alpha=0.9
+  geom_point(shape=15, size=5, aes(color=variable), position=position_dodge2(width = 1.0) , show.legend=T) + #alpha=0.9 aes(color=variable)
+  scale_color_manual(values = c("#A6CEE3", "#33A02C","#E31A1C", "#FDBF6F","#6A3D9A", '#be214d', "#B2DF8A", "#1F78B4","#FB9A99", "#FF7F00", "#CAB2D6", '#93003a'))+
   #scale_color_manual(values = c('#00429d', '#ffd3bf','#3761ab','#ffa59e', '#5681b9','#f4777f', '#73a2c6', '#dd4c65','#93c4d2','#be214d', '#b9e5dd', '#93003a'))+
-  scale_color_manual(values = c('#00429d','#93003a', '#3761ab','#be214d', '#5681b9','#dd4c65', '#73a2c6', '#f4777f','#93c4d2','#ffa59e', '#b9e5dd','#ffd3bf' ))+
+  #scale_color_manual(values = c('#00429d','#93003a', '#3761ab','#be214d', '#5681b9','#dd4c65', '#73a2c6', '#f4777f','#93c4d2','#ffa59e', '#b9e5dd','#ffd3bf' ))+
   # from https://www.vis4.net/palettes/#/13|d|00429d,96ffea,ffffe0|ffffe0,ff005e,93003a|1|1
   #scale_color_brewer(palette = "Dark2")+
   coord_flip() + theme_bw() +
   #scale_alpha_discrete(range = c(0.35, 0.9))+
   #scale_x_continuous(trans = "reverse") + 
-  labs(x="", y="Unadjusted prevalence difference per 100 kids") + 
+  labs(x="", y="Prevalence difference per 100 children") + 
   theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
         axis.ticks.y=element_blank(),
         panel.grid.minor=element_blank()) +

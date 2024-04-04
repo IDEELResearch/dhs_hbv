@@ -4,7 +4,13 @@
 #install.packages("renv")
 renv::init()
 
+# after updating R, run:
+install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE) 
+renv::restore(exclude = "INLA")
+inla.upgrade() # for the stable version 
+library(INLA) 
 # Load packages---------
+install.packages("here")
 library(tidyverse)
 library(foreign)
 library(here)
@@ -47,6 +53,8 @@ dhsmeta %>% filter(hv027==1 &  hv105 < 6 & (hc1>=6 | is.nan(hc1)) & sh310a == 1)
 
 # subset data frame 
 dhsmeta <- dhsmeta %>% mutate_at(c('hv027', 'hc1', 'sh310a', 'hv103'), as.numeric) 
+# elig_kids....and subsequent datasets includes eligibility on consent and de factor whereas
+# elig_kids_2 and subsequent datasets applies propensity score to top level of all children selected
 elig_kids <- dhsmeta %>% filter(hv027==1 & (hc1 >= 6 & hc1<=59) & sh310a == 1 & hv103==1) # %>% select(cluster_hh, hv001, hv002, hvidx, kids_barcode, hv105, hv104, hc1, hv270, pfldh_kids,
                                                                                           #           hv005, hv006, hv024, shnprovin, hv025, hv040, hv201, hv106, hv246, hml1, hml10, hml20, hv027, hv028)
 #weight up to full n=8547 with propensity score
@@ -67,35 +75,6 @@ elig_kids_2 <- elig_kids_2 %>% mutate(validbarcode = case_when(
   TRUE ~ 1
 ))
 table(barcode = elig_kids_2$validbarcode, consent =elig_kids_2$sh310a, useNA = "always")
-
-# add hbv results onto this eligible kid df
-elig_kids_wres <- left_join(elig_kids, kid_hbv_kr_dis[,c("kids_barcode", grep("hbv", names(kid_hbv_kr_dis), value=T))], by = "kids_barcode")
-elig_kids_2_wres <- left_join(elig_kids_2, kid_hbv_kr_dis[,c("kids_barcode", grep("hbv", names(kid_hbv_kr_dis), value=T))], by = "kids_barcode")
-
-elig_kids_wres %>% filter(validbarcode==1) %>%  group_by(hbvresult5) %>% count()
-elig_kids_2_wres %>% filter(validbarcode==1) %>%  group_by(hbvresult5) %>% count()
-
-# of these, final df with hbv results
-elig_kids_whbvres <- elig_kids_wres %>% filter(validbarcode==1 & !is.na(hbvresult5)) # make sure hbvresult5 has all results
-elig_kids_2_whbvres <- elig_kids_2_wres %>% filter(validbarcode==1 & !is.na(hbvresult5)) # make sure hbvresult5 has all results
-
-# of these, final df without hbv results
-nores <- elig_kids_wres %>% filter(is.na(hbvresult5) & validbarcode==1)
-nores2 <- elig_kids_2_wres %>% filter(is.na(hbvresult5) & validbarcode==1)
-
-# hbv results that aren't in final df (df per jan2024 committee discussion about starting with SURVEYED not SAMPLES)
-hbvres_notonfinaldf <- kid_hbv_kr_dis %>% filter(!(kids_barcode %in% elig_kids_whbvres$kids_barcode))
-# check age
-table(hbvres_notonfinaldf$hv105, useNA = "always") # MOST are 5yos (>59months) for the first new flow chart
-table(hbvres_notonfinaldf$hv105_fromhc1, useNA = "always")
-
-# look at the 2903 with exhausted sample
-table(nores2$pfldh_kids, useNA = "always")
-table(nores$pfldh_kids, useNA = "always")
-
-# connect hh members
-elig_kids_whbvres %>% summarize(count_distinct = n_distinct(cluster_hh))
-elig_kids_2_whbvres %>% summarize(count_distinct = n_distinct(cluster_hh))
 
 # propensity score code to address missingness-----------
 ## see spring 2022 EPID 722 exercise 4 (starting at q6)
@@ -127,19 +106,25 @@ elig_kids_2 <- elig_kids_2 %>% mutate(bc_select = case_when( # exchange between 
     hc1 >= 60 ~ 5) %>% as.factor(), # kids >=60mo = 5years
   discr = case_when( # when months/years ages discrepant
     hv105_fromhc1 == hv105 ~ 1,
-    hv105_fromhc1 != hv105 ~ 0)
+    hv105_fromhc1 != hv105 ~ 0),
+  sh310a_nano = ifelse(is.nan(sh310a), 2,sh310a )
   )
 
 table(elig_kids_2$pf_posvsoth, useNA = "always")
 table(elig_kids_2$hc1, useNA = "always")
 table(elig_kids_2$hv105, useNA = "always")
+table(elig_kids_2$sh310a, useNA = "always")
+table(elig_kids_2$sh310a_nano, useNA = "always")
+table(elig_kids_2$hv026, elig_kids_2$hv025,useNA = "always")
+table(elig_kids_2$hv101, useNA = "always")
 
 #ps with full barcodes/dataset
 ## vars of prop score: hv006 - month of interview; shnprovin - province (try hv024, the pre-2015 provinces, if rank deficient warning affects);
-## hv025 - urban/rural; hv040 - cluster altitude in meters; hv104 - sex; hv201 - source of drinking water; hv106 - education (delete for kids?);
+## hv026 - capital/city/town/countryside, more specific than hv025 - urban/rural; hv040 - cluster altitude in meters; hv104 - sex; hv201 - source of drinking water; hv106 - education (delete for kids?);
 ## hv246 - owns livestock; hml1 - mosquito nets; hml10 - insecticide treated net; hml20 - slept under net; hv270 - hh wealth; hv105 - age
-selectioninstudy <- glm(bc_select ~ hv006 + shnprovin + hv025 + hv104 + hv246 + hv270 + hv105_fromhc1 + pf_posvsoth + sh310a + hv103, #check removing: +hml10+hml20; removed: hv106 (education), hml1 (has net), hv201 (water)
-                        data=elig_kids,
+## sh310a_nano consent for participation (nan as refused); + sh310a_nano
+selectioninstudy <- glm(bc_select ~ hv101 + shnprovin + hv026 + hv104 + hv270 + hv105_fromhc1 + pf_posvsoth  + hv103, #check removing: +hml10+hml20; removed: hv246 (livestock), hv006 (month of interview), hv106 (education), hml1 (has net), hv201 (water)
+                        data=elig_kids_2,
                         family=binomial("logit"))
 summary(selectioninstudy$coefficients) # vary significantly - more work into what should be included
 # getting warning about rank deficiency
@@ -172,7 +157,7 @@ nrow(elig_kids_2)
 
 #look at distribution of weights, by whether sample was tested for hbv
 elig_kids_2 %>% 
-  ggplot() + geom_histogram(aes(x=sw)) + facet_wrap(~bc_select, nrow = 2)
+  ggplot() + geom_histogram(aes(x=iptw_s)) + facet_wrap(~bc_select, nrow = 2)
 
 # Q to confirm - once subsetted into participants who are included, the weights will just not sum to 1, right? or does standardization take care of that
 test <- elig_kids %>% filter(kids_barcode %in% elig_kids_whbvres$kids_barcode) %>% select(c(kids_barcode, sw, iptw_s, bc_select))
@@ -180,10 +165,44 @@ summary(test$sw)
 summary(test$iptw_s)
 mean(test$sw)
 
-elig_kids_whbvres_wt <- left_join(elig_kids_2_whbvres, elig_kids_2[,c("kids_barcode","iptw_s")], by ="kids_barcode")
+# add hbv results onto this eligible kid df------
+elig_kids_wres <- left_join(elig_kids, kid_hbv_kr_dis[,c("kids_barcode", grep("hbv", names(kid_hbv_kr_dis), value=T))], by = "kids_barcode")
+elig_kids_2_wres <- left_join(elig_kids_2, kid_hbv_kr_dis[,c("kids_barcode", grep("hbv", names(kid_hbv_kr_dis), value=T))], by = "kids_barcode")
+
+elig_kids_wres %>% filter(validbarcode==1) %>%  group_by(hbvresult5) %>% count()
+elig_kids_2_wres %>% filter(validbarcode==1) %>%  group_by(hbvresult5) %>% count()
+
+# of these, final df with hbv results (subset to those with results)
+elig_kids_whbvres <- elig_kids_wres %>% filter(validbarcode==1 & !is.na(hbvresult5)) # make sure hbvresult5 has all results
+elig_kids_2_whbvres <- elig_kids_2_wres %>% filter(validbarcode==1 & !is.na(hbvresult5)) # make sure hbvresult5 has all results
+
+# of these, final df without hbv results
+nores <- elig_kids_wres %>% filter(is.na(hbvresult5) & validbarcode==1)
+nores2 <- elig_kids_2_wres %>% filter(is.na(hbvresult5) & validbarcode==1)
+
+# hbv results that aren't in final df (df per jan2024 committee discussion about starting with SURVEYED not SAMPLES)
+hbvres_notonfinaldf <- kid_hbv_kr_dis %>% filter(!(kids_barcode %in% elig_kids_whbvres$kids_barcode))
+# check age
+table(hbvres_notonfinaldf$hv105, useNA = "always") # MOST are 5yos (>59months) for the first new flow chart
+table(hbvres_notonfinaldf$hv105_fromhc1, useNA = "always")
+
+# look at the 2903 with exhausted sample
+table(nores2$pfldh_kids, useNA = "always")
+table(nores$pfldh_kids, useNA = "always")
+
+# distinct households
+elig_kids_whbvres %>% summarize(count_distinct = n_distinct(cluster_hh))
+elig_kids_2_whbvres %>% summarize(count_distinct = n_distinct(cluster_hh))
+
+# subsetting happens above, this merge no longer needed
+# elig_kids_whbvres_wt <- left_join(elig_kids_2_whbvres, elig_kids_2[,c("kids_barcode","iptw_s")], by ="kids_barcode")
+
+# elig_kids_whbvres_wt used below; since merge above no longer needed, change name here
+elig_kids_whbvres_wt <- elig_kids_2_whbvres
+nrow(elig_kids_whbvres_wt)
 summary(elig_kids_whbvres_wt$iptw_s)
 mean(elig_kids_whbvres_wt$iptw_s)
-nrow(elig_kids_whbvres_wt)
+
 # add and check unstabilized weights 
 test2 <- left_join(elig_kids_whbvres, elig_kids[,c("kids_barcode","iptw_s","iptw_u")], by ="kids_barcode")
 summary(test2$iptw_u)
@@ -211,6 +230,8 @@ elig_kids_whbvres_wt$both_wt_old <- (elig_kids_whbvres_wt$iptw_s)*(elig_kids_whb
 elig_kids_whbvres_wt$both_wt_new <- (elig_kids_whbvres_wt$iptw_s)*(elig_kids_whbvres_wt$hv028_div)
 summary(elig_kids_whbvres_wt$both_wt_old)
 summary(elig_kids_whbvres_wt$both_wt_new)
+#whether hv028 or hv005 is the household weight used, the summary of the weights is very similar, so results won't differ much
+#hv028 is the weight for households selected for the male subsample (hv027), which are the households in which children were selected for DBS testing - unclear online, using this one
 
 #New variables---------------
 ##Province collapsed------
@@ -331,7 +352,6 @@ elig_kids_whbvres_wt %>% group_by(hc57, anemia) %>% count()
 # convert certain variables to factors for analysis
 elig_kids_whbvres_wt <- elig_kids_whbvres_wt %>% mutate_at(c('sevstunt', 'modstunt', 'stunt', 'sevwasting', 'modwasting', 'wasting', 'weightforage', 'anemia'), as.factor)
 
-
 #Merge KR vars on------
 # see 05_famtreesdhs.R for merge of biospecimen results, PR, and KR (asked to caretakers about children, able to merge ~75%)
 # d_k_or imported from CDKR61FL.DTA at beginning
@@ -368,12 +388,14 @@ d_k_or_red$fromKR <- 1
 ##Merge step-----
 elig_kids_whbvres_wt_kr <- left_join(elig_kids_whbvres_wt, d_k_or_red, by = "clus_hh_ind" )
 ##check conditions of those without KR data----------
-elig_kids_whbvres_wt_kr %>% group_by(fromKR) %>% count() #595 no KR data
+elig_kids_whbvres_wt_kr %>% group_by(fromKR) %>% count() #659 no KR data
 # mother living? hv111==1
 elig_kids_whbvres_wt_kr %>% group_by(fromKR, hv111) %>% count()
 # living with mother?  (hv112==0) - only those living with mother were surveyed for KR
 elig_kids_whbvres_wt_kr %>% group_by(fromKR, hv112) %>% count() %>% print(n=Inf)
-elig_kids_whbvres_wt_kr %>% group_by(fromKR, hv102) %>% count()
+elig_kids_whbvres_wt_kr %>% filter(is.na(fromKR)) %>% group_by(hv111,hv112) %>% count()
+elig_kids_whbvres_wt_kr %>% filter(is.na(fromKR) & hv111 == 1 & hv112 != 0 ) %>%  count()
+# of 659 kids without KR data, 80 mother was deceased or na, 419 not living with mother, 160 unknown why?
 
 ##New vars------
 ###DPT vaccination: dpt1, dpt2, dpt3, dpt_count, dpt_doses---------

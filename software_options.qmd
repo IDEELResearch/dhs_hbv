@@ -59,7 +59,10 @@ nimbleCode({
 
 Let's load in the data.
 ```{r}
-data <- read_rds(here("data", "italy", "italy_mortality.rds"))
+# data <- read_rds(here("data", "italy", "italy_mortality.rds"))
+data <- read_rds("/Users/camillem/Documents/GitHub/cumcbayes/data/italy/italy_mortality.rds")
+
+
 
 data <- data |>
   filter(year == 2018) |>
@@ -68,7 +71,8 @@ data <- data |>
 ```
 
 ```{r}
-shp_italy <- read_rds(here("data", "italy", "italy_shp.rds")) |> arrange(SIGLA)
+# shp_italy <- read_rds(here("data", "italy", "italy_shp.rds")) |> arrange(SIGLA)
+shp_italy <- read_rds("/Users/camillem/Documents/GitHub/cumcbayes/data/italy/italy_shp.rds") |> arrange(SIGLA)
 
 ggplot(aes(fill = mean.pop), data = shp_italy) +
   geom_sf(colour = "white") +

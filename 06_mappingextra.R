@@ -161,7 +161,7 @@ output_points <- st_join(output_df, DRC, join = st_intersects) %>% filter(!is.na
 dpt_points <- st_join(dpt, DRC, join = st_intersects) %>% filter(!is.na(Country))
 
 # simple map of dhs cluster locations with kid samples
-drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%   st_transform(4326)
+drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%  st_transform(4326)
 drccities = st_read("/Users/camillem/Documents/GitHub/dhs_hbv/Data/cod_cities_20180906h/COD_CITIES_20180906H.shp", stringsAsFactors = FALSE) %>% filter(estimate20 > 200000 & name != "Kananga") %>%   st_transform(4326) # Mbuji-Mayi too close to Kananga
 
 drcwat = st_read("/Users/camillem/Documents/GitHub/hbv_hover/COD_wat/COD_water_areas_dcw.shp", stringsAsFactors = FALSE)   %>% filter(HYC_DESCRI == "Perennial/Permanent" & NAME != "UNK") %>%  st_transform(4326) #%>% filter(NAME=="CONGO" | NAME == "LUALABA (CONGO)" | NAME == "OUBANGUI(UBANGI)")
