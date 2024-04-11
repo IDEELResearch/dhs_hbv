@@ -24,12 +24,14 @@ library(broom)
 
 # Outcome vars: missingness and sens analyses------------------
 # hbvresult5, hbvresult1, hbvresult2, hbvresult100
-elig_kids_whbvres_wt_kr_nomiss <- elig_kids_whbvres_wt_kr_nomiss %>% mutate_at(c("beat","injec"), as.factor)
 elig_kids_whbvres_wt_kr_nomiss <- elig_kids_whbvres_wt_kr %>% filter(anemia_f != "Not available")
+elig_kids_whbvres_wt_kr_nomiss <- elig_kids_whbvres_wt_kr_nomiss %>% mutate_at(c("beat","injec"), as.factor)
 
 elig_kids_whbvres_wt_kr_nomiss$sex <- relevel(elig_kids_whbvres_wt_kr_nomiss$sex, ref = "Female")
+elig_kids_whbvres_wt_kr_nomiss$injec_f <- relevel(factor(elig_kids_whbvres_wt_kr_nomiss$injec_f), ref = "None")
 
-table(elig_kids_whbvres_wt_kr$beat_f)
+
+table(elig_kids_whbvres_wt_kr$injec_f)
 table(elig_kids_whbvres_wt_kr$anemia_f, elig_kids_whbvres_wt_kr$hbvresult5)
 # discuss with Jess about what to do with the 2908 - impute, leave out, etc.
 # for now proceed with bounding the 46 with low vol
@@ -115,7 +117,7 @@ summary(beat)
 confint(beat)
 
 # as function----
-vars <- c("hv105_fromhc1_f", 'sex','reltoheadhh_simp', 'urbanrural','location','wealth','anemia_f',"modstunt", 'pfmalaria','tetab', "dpt_doses_f", "injec_f", "beat_f")
+vars <- c("hv105_fromhc1_f", 'sex','reltoheadhh_simp', 'urbanrural','location','wealth','anemia_f',"modstunt_f", 'pfmalaria','tetab', "dpt_doses_f", "injec_f", "beat_f")
 # run separately: "injec_f", 'v480', provgrp_kin_l, ,
 
 bivs_5 <- function(var){ # glm function
@@ -159,8 +161,10 @@ glmresults_5 <- glmresults_5  %>%  mutate(desorder=row_number())
 
 table(glmresults_5$term)
 view(glmresults_5)
-#glmresults_5 <- glmresults_5 %>% mutate(setorder = )
+# for Table 2 in 02_tablefigures.R
+tab2pds <- glmresults_5 %>% select(c(term, pd100, pdcilow100, pdciup100))
 
+# aesthetics for figure 3
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f1"] <- "1 year vs <1 year"
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f2"] <- "2 years vs <1 year"
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f3"] <- "3 years vs <1 year"
