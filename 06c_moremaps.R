@@ -135,9 +135,10 @@ view(k2)
 k2 <- k2 %>% mutate(  age = str_extract(variable, '[0-9]+') %>% as.numeric(),
                       birmo = 60 - age)
 view(k2)
+k2 <- k2 %>% mutate(hyphen = str_split_fixed(level, "prov2015", 2)[,2])
+
 provprev <- k2 %>% group_by(hyphen) %>% summarise(avgprev = mean(value)) %>% mutate(belowavg = case_when(avgprev>1.2 ~ "Prev >1.2%",
                                                                                                            avgprev <=1.2 ~ "Avg/below 1.2%"))
-k2 <- k2 %>% mutate(hyphen = str_split_fixed(level, "prov2015", 2)[,2])
 
 k3 <- left_join(k2, provprev, by = "hyphen")
 # get prov groupings 

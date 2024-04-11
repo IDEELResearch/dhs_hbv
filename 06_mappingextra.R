@@ -1,13 +1,26 @@
 # 06_mapping extra
+renv::install("sf@1.0-15", type = "binary")
+install.packages("PROJ")
+install.packages("proj4")
+install.packages("rgdal", type = "binary")
+install.packages('sf', repos = c('https://r-spatial.r-universe.dev'))
+# 
+renv::snapshot()
+renv::rebuild()
+
+library(PROJ)
 library(tidyverse)
 library(sf)
 library(colorspace)
 library(gstat)
 library(stars)
 library(tidyverse)
-library(patchwork)
 library(sp)
 library(viridis)
+library(rgdal)
+library(survey)
+library(srvyr)
+
 # TO USE from 01_datacleaning_revR: elig_kids_whbvres_wt_kr
 # should be using cluster number to impute, not cluster/hh!!!
 
@@ -161,7 +174,10 @@ output_points <- st_join(output_df, DRC, join = st_intersects) %>% filter(!is.na
 dpt_points <- st_join(dpt, DRC, join = st_intersects) %>% filter(!is.na(Country))
 
 # simple map of dhs cluster locations with kid samples
-drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%  st_transform(4326)
+drcprov0 = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.shp", stringsAsFactors = FALSE) %>% filter(ADM0_NAME=="DEMOCRATIC REPUBLIC OF THE CONGO") %>%   st_transform(4326)
+provlab <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx", sheet = "provlabels")
+drcprov <- left_join(drcprov0, provlab, by = "ADM1_VIZ_N")
+
 drccities = st_read("/Users/camillem/Documents/GitHub/dhs_hbv/Data/cod_cities_20180906h/COD_CITIES_20180906H.shp", stringsAsFactors = FALSE) %>% filter(estimate20 > 200000 & name != "Kananga") %>%   st_transform(4326) # Mbuji-Mayi too close to Kananga
 
 drcwat = st_read("/Users/camillem/Documents/GitHub/hbv_hover/COD_wat/COD_water_areas_dcw.shp", stringsAsFactors = FALSE)   %>% filter(HYC_DESCRI == "Perennial/Permanent" & NAME != "UNK") %>%  st_transform(4326) #%>% filter(NAME=="CONGO" | NAME == "LUALABA (CONGO)" | NAME == "OUBANGUI(UBANGI)")
@@ -217,7 +233,7 @@ A5 <-
     geom_sf(data=drcwat, color="steelblue")+
     geom_sf(data=drccities, color = "black", shape = "18")+
     geom_sf_text(data=drccities, aes(label = name), size = 3, fontface = "bold")+
-    labs(color='', shape = '') + 
+    labs(color='HBsAg positivity prevalence', shape = '') + 
   scale_shape_discrete(labels = c("Original","Imputed"))+
   theme_bw(base_size=10) + 
   scale_color_manual(values = my_gregra)+
@@ -639,11 +655,12 @@ drcprov = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.s
 library(survey)
 library(srvyr)
 library(readxl)
+library(janitor)
 mainprov5 <- svyby(~prov2015,~hbvresult5, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
 mainprov5 <- mainprov5 %>% mutate(level = paste0('hbv5.', level))
 mainprov5t <- as.data.frame(t(as.data.frame(mainprov5))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
 mainprov5t <- mainprov5t %>% mutate(across(-c(level), as.numeric))
-view(mainprov5t)
+view(mainprov5)
 
 mainprov1 <- svyby(~prov2015,~hbvresult1, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
 mainprov1 <- mainprov1 %>% mutate(level = paste0('hbv1.', level))
@@ -688,7 +705,7 @@ mainprovs_m <- mainprovs_m %>% mutate(value_g = case_when(
                     labels = c("0%", "<1%","1%","2%", "3%","4%","5+%")))
 
 drcprov_sens <- left_join( drcprov[,c("hyphen", "geometry")], mainprovs_m, by="hyphen")
-
+view(drcprov)
 #prov_all <-
 ggplot()+
   geom_sf(data=admin0, fill="snow3", color="snow4") +
@@ -705,7 +722,7 @@ ggplot()+
   #               size = 3, fontface = "bold"  ) +
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
-  labs(fill = "HBsAg prevalence (%)")+
+  labs(fill = "HBsAg positivity prevalence (%)")+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
         axis.title = element_blank(),
@@ -734,7 +751,7 @@ prov5 <-
   geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 3) + #, fontface = "bold"
   geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 3) + #, fontface = "bold"
   geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 3) + #, fontface = "bold"
-  labs(fill="HBsAg prevalence")+
+  labs(fill="HBsAg positivity prevalence")+
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   theme(panel.grid.major = element_blank(), 
@@ -1372,7 +1389,7 @@ view(sexprov_w_w)
 table(drcprov$hyphen)
 table(sexprov_w_w$prov2015)
 sexprov_w_w <- sexprov_w_w %>% rename(hyphen = prov2015)
-
+view(drcprov)
 
 test <- left_join(drcprov[, c("hyphen", "geometry")],sexprov_w_w, by="hyphen")
 #wtdagesexprov_lg <- left_join(wtdagesexprov_l, drcprov[, c("prov_name", "geometry")], by="prov_name")
@@ -1412,11 +1429,6 @@ ggplot()+
         panel.background = element_rect(fill="#daeff8", color=NA),
         legend.title = element_blank())#
 ggsave('./Plots/provsex_wtd.png', width=6, height=6)
-
-
-#Moran's i-------------
-library(ape)
-Moran.I(uniquescar$scarprev, test.hhdist.inv)
 
 
 
