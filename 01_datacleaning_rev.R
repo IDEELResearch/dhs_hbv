@@ -107,7 +107,14 @@ elig_kids_2 <- elig_kids_2 %>% mutate(bc_select = case_when( # exchange between 
   discr = case_when( # when months/years ages discrepant
     hv105_fromhc1 == hv105 ~ 1,
     hv105_fromhc1 != hv105 ~ 0),
-  sh310a_nano = ifelse(is.nan(sh310a), 2,sh310a )
+  sh310a_nano = ifelse(is.nan(sh310a), 2,sh310a),
+  reltoheadhh=factor(hv101, 
+                     levels = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,98),
+                     labels = c("Head", "Spouse","Son/daughter","Son/daughter-in-law","Grandchild","Parent","In-laws","Brother/sister","Co-spouse","Other","Adopted/in custody","Not related","Nephew/niece","Nephew/niece by marriage","Don't know")),
+  reltoheadhh_simp = case_when(
+    hv101 == "3" ~ "Child", # son/daughter
+    hv101 == "5" ~ "Grandchild", # grandchild
+    TRUE ~ "Other") # all others since so few counts in each
   )
 
 table(elig_kids_2$pf_posvsoth, useNA = "always")
@@ -123,7 +130,7 @@ table(elig_kids_2$hv101, useNA = "always")
 ## hv026 - capital/city/town/countryside, more specific than hv025 - urban/rural; hv040 - cluster altitude in meters; hv104 - sex; hv201 - source of drinking water; hv106 - education (delete for kids?);
 ## hv246 - owns livestock; hml1 - mosquito nets; hml10 - insecticide treated net; hml20 - slept under net; hv270 - hh wealth; hv105 - age
 ## sh310a_nano consent for participation (nan as refused); + sh310a_nano
-selectioninstudy <- glm(bc_select ~ hv101 + shnprovin + hv026 + hv104 + hv270 + hv105_fromhc1 + pf_posvsoth  + hv103, #check removing: +hml10+hml20; removed: hv246 (livestock), hv006 (month of interview), hv106 (education), hml1 (has net), hv201 (water)
+selectioninstudy <- glm(bc_select ~ shnprovin + hv026 + hv104 + hv270 + hv105_fromhc1 + pf_posvsoth +  hv103 + reltoheadhh_simp, #check removing: +hml10+hml20; removed: hv106 (education), hml1 (has net), hv201 (water)
                         data=elig_kids_2,
                         family=binomial("logit"))
 summary(selectioninstudy$coefficients) # vary significantly - more work into what should be included
@@ -131,7 +138,7 @@ summary(selectioninstudy$coefficients) # vary significantly - more work into wha
 
 # denom of weights
 elig_kids_2$d <- predict(selectioninstudy, elig_kids_2, type = "response")
-
+summary(elig_kids_2$d)
 # numerator of weights
 num_mod <- glm(bc_select ~ 1, 
                data = elig_kids_2, 
@@ -153,7 +160,6 @@ elig_kids_2 <- elig_kids_2 %>%
 summary(elig_kids_2$sw) # 722 standardized weights
 summary(elig_kids_2$iptw_u) # unstandardized weights from Hillary
 summary(elig_kids_2$iptw_s) # standardized weights from Hillary
-nrow(elig_kids_2)
 
 #look at distribution of weights, by whether sample was tested for hbv
 elig_kids_2 %>% 
@@ -438,6 +444,7 @@ beat = case_when(
   v744a > 0 | v744b > 0 | v744c > 0 | v744d > 0 | v744e > 0 ~ 1, 
   v744a == 0 | v744b ==  0 | v744c == 0 | v744d == 0 | v744e == 0 ~ 0
 ))
+elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate_at(c('v480', 'injec','beat'), as.factor)
 # check new variables
 elig_kids_whbvres_wt_kr %>% group_by(dpt1, dpt2, dpt3, dpt_count, dpt_doses) %>% count()
 elig_kids_whbvres_wt_kr %>% group_by(v477, injec) %>% count()
