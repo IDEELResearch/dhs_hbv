@@ -144,7 +144,7 @@ beat <- as.data.frame(survtable_all("beat_f")) %>% rownames_to_column(var = "cov
 reused <- as.data.frame(survtable_all("v480")) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "v480", 2)[,2], cov = "v480") 
 view(reused)
-all_tot <- dplyr::bind_rows(list(age, sex, relhh, urbrur, location,  wealth, pfmal, tetorig, poskids, anem, modstu, dpt_dos, inje, beat, prov), .id = 'source') #tetlower, tetupper,
+all_tot <- dplyr::bind_rows(list(age, sex, relhh, urbrur, location,  wealth, pfmal, tetorig, poskids, anem, modstu, dpt_dos, inje, reused, beat, prov), .id = 'source') #tetlower, tetupper,
 all_tot <- all_tot %>% filter(total>0) %>% select(-SE)
 all_tot <- all_tot %>% group_by(source) %>% mutate(totperc = 100*(total / sum(total)))  %>% ungroup()
 view(all_tot)
@@ -167,8 +167,9 @@ Tab1_num_tot2 <- Tab1_num_tot %>% dplyr::rename(covname = cov)
 
 tab1_simp_all <- dplyr::bind_rows(list(tot, Tab1_num_tot2, tab1_simp))
 view(tab1_simp_all)
+tab1_simp_all$levels <- ifelse(tab1_simp_all$covname=="v4808", "Don't know", ifelse(tab1_simp_all$covname=="v4801","New, unopened", ifelse(tab1_simp_all$covname=="v4800","Opened/used" ,tab1_simp_all$levels)))
 #drop = c(11,15,26,28,30,34,36,38,39)
-drop = c("sexFemale", "urbanruralUrban", "pfmalariaPf-negative", "tetabNonreactive", "tetabIndeterminate","anemia_fMild-to-none", "anemia_fNot available", "modstunt_fNo stunting", "modstunt_fNot available")
+drop = c("sexFemale", "urbanruralUrban", "pfmalariaPf-negative", "tetabNonreactive", "tetabIndeterminate","anemia_fMild-to-none", "anemia_fNot available", "modstunt_fNo stunting", "modstunt_fNot available", "v4808")
 tab1_simp_all2 <- tab1_simp_all %>%
   filter(!covname %in% drop )
 view(tab1_simp_all2)
@@ -254,6 +255,9 @@ tot_by <- cbind(tothbv,tot2)
 tot_by <- tot_by %>% select(-covname) %>% relocate(cov, levels)
 tot_by$Tab2prevci <- ""  # no prev diff for overall, but need var on dataframe for Tab2 merge
 tot_by$total <- as.numeric(tot_by$total)
+
+prop.table(svytable(~hbvresult5, designf_dhs2))
+svyciprop(~hbvresult5,  designf_dhs2, method="lo")
 
 ## hbv n onto by df-----
 all_byct <- dplyr::bind_rows(list(tot_by, all_byc2))

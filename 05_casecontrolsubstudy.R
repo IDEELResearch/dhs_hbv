@@ -24,19 +24,19 @@ kids_hh <-
             n_poskids100 = sum(hbvresult100), 
             n_kids = n()) %>% 
   mutate(casehh5 = case_when(
-    n_poskids5 > 0 ~ 1, # case household if at least one pos kid
+    n_poskids5 == 1 ~ 1, # case household if one pos kid (remove the ~7 hh with two pos kids)
     n_poskids5 == 0 ~ 0, # control household if zero positive children
     TRUE ~ NA_real_),
     casehh1 = case_when(
-      n_poskids1 > 0 ~ 1, # case household if at least one pos kid
+      n_poskids1 == 1 ~ 1, # case household if one pos kid (remove the ~7 hh with two pos kids)
       n_poskids1 == 0 ~ 0, # control household if zero positive children
       TRUE ~ NA_real_),
     casehh2 = case_when(
-      n_poskids2 > 0 ~ 1, # case household if at least one pos kid
+      n_poskids2 == 1 ~ 1, # case household if one pos kid (remove the ~7 hh with two pos kids)
       n_poskids2 == 0 ~ 0, # control household if zero positive children
       TRUE ~ NA_real_),
     casehh100 = case_when(
-      n_poskids100 > 0 ~ 1, # case household if at least one pos kid
+      n_poskids100 == 1 ~ 1, # case household if one pos kid (remove the ~7 hh with two pos kids)
       n_poskids100 == 0 ~ 0, # control household if zero positive children
       TRUE ~ NA_real_),
   )
@@ -65,11 +65,12 @@ kids_hh <- kids_hh %>% mutate(
     TRUE ~ NA_real_)
   )
 kids_hh %>% group_by(casehh5, ccstat5fin) %>% count()
-
+view(kids_hh)
 # merge counts back onto df with all kids (likely a way to do this in a single step, but this works for now)
 elig_kids_whbvres_wt_kr <- left_join(elig_kids_whbvres_wt_kr, kids_hh[, c("cluster_hh","ccstat5fin", "ccstat1fin","ccstat2fin","ccstat100fin")], by = "cluster_hh")
 nrow(elig_kids_whbvres_wt_kr)
 elig_kids_whbvres_wt_kr %>% group_by(ccstat1fin) %>% count()
+elig_kids_whbvres_wt_kr %>% group_by(ccstat5fin) %>% count()
 
 # case-control substudy investigating hbsag prev among household members-----------
 # subset kids df 
@@ -135,7 +136,7 @@ table(poscount = ad_sum_clusthh$prev5_adtested, useNA = "always")
 hhmemb5 <- left_join(hhmemb5, ad_sum_clusthh, by = "cluster_hh")
 # counts by case/control
 hhmemb5 <- left_join(hhmemb5, kids_hh[, c("cluster_hh", "n_poskids5","ccstat5fin" )], by = "cluster_hh")
-addmargins(table(hhmemb5$n_poskids5, useNA = "always"))
+addmargins(table(hhmemb5$ccstat5fin, useNA = "always"))
 
 table(ccstat = hhmemb5$ccstat5fin, hhmemb5$hbv_adcorr, useNA = "always" )
 # still seeing 8% prevalence among control households
@@ -149,10 +150,14 @@ table(hhmemb5$n_posad5, hhmemb5$ccstat5fin)
 hhmemb5 %>% group_by(ccstat5fin, eligtesting) %>% count()
 # within adults in DBS range, how many had barcodes collected
 hhmemb5 %>% filter(eligtesting == 1) %>% group_by(ccstat5fin,bc_coll ) %>% count()
-hhmemb5 %>% filter(eligtesting == 1 &bc_coll==0) %>% reframe(ccstat5fin,dbsbarcode,ha64, hb64 )
+hhmemb5 %>% filter(eligtesting == 1 &bc_coll==0 &ccstat5fin==1) %>% reframe(ccstat5fin,dbsbarcode,ha64, hb64 )
+hhmemb5 %>% filter(eligtesting == 1 &bc_coll==0 &ccstat5fin==0) %>% reframe(ccstat5fin,dbsbarcode,ha64, hb64 )
 # within adults in DBS range, how many consented for additional testing on their DBS
+hhmemb5 %>% filter(eligtesting == 1 &ccstat5fin==0) %>% group_by(bc_coll, consent_add,hbv_adcorr ) %>% count()
+hhmemb5 %>% filter(eligtesting == 1 &ccstat5fin==0 &bc_coll==1 &consent_add==1) %>% group_by(hbv_adcorr ) %>% count()
+hhmemb5 %>% filter(eligtesting == 1) %>% group_by(ccstat5fin, bc_coll, consent_add,hbv_adcorr ) %>% count()
 hhmemb5 %>% filter(eligtesting == 1 & bc_coll==1) %>% group_by(ccstat5fin ) %>% count()
-hhmemb5 %>% filter(eligtesting == 1 & bc_coll==1) %>% group_by(ccstat5fin,consent_add ) %>% count()
+hhmemb5 %>% filter(eligtesting == 1 & bc_coll==1) %>% group_by(ccstat5fin,consent_add,hbv_adcorr ) %>% count()
 ### who had missing consent - are these adults without DBS?
 hhmemb5 %>% filter(eligtesting == 1 & is.na(consent_add)) %>% group_by(ccstat5fin) %>%  reframe(dbsbarcode, ha64, hb64, pfldh_adult) %>% print(n=Inf)
 # adults with sample with consent
@@ -214,9 +219,28 @@ elig_kids_whbvres_wt_kr <- left_join(elig_kids_whbvres_wt_kr, ad_sum_clusthh[, c
 elig_kids_whbvres_wt_kr %>% group_by(ccstat5fin, n_posad5) %>% count()
 elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate(exposed = case_when(n_posad5 >0 ~ 1,
                                             n_posad5==0 ~ 0))
+nrow(elig_kids_whbvres_wt_kr)
+elig_kids_whbvres_wt_kr %>% group_by(hbvresult5, ccstat5fin, exposed) %>% count()
 
-elig_kids_whbvres_wt_kr %>% group_by(exposed, hbvresult5) %>% count()
-
+# exclude those that were cases at each sco level
+elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate(
+  ccstat5fin2 = case_when(
+    hbvresult5 != ccstat5fin ~ NA_real_,
+    TRUE ~ ccstat5fin),
+  ccstat1fin2 = case_when(
+    hbvresult1 != ccstat1fin ~ NA_real_,
+    TRUE ~ ccstat1fin),
+  ccstat2fin2 = case_when(
+    hbvresult2 != ccstat2fin ~ NA_real_,
+    TRUE ~ ccstat1fin),
+  ccstat100fin2 = case_when(
+    hbvresult100 != ccstat100fin ~ NA_real_,
+    TRUE ~ ccstat100fin)
+)
+elig_kids_whbvres_wt_kr %>% group_by(hbvresult5, ccstat5fin, ccstat5fin2, exposed) %>% count()
+elig_kids_whbvres_wt_kr %>% group_by(hbvresult1, ccstat1fin, ccstat1fin2, exposed) %>% count()
+elig_kids_whbvres_wt_kr %>% group_by(hbvresult2, ccstat2fin, ccstat2fin2, exposed) %>% count()
+elig_kids_whbvres_wt_kr %>% group_by(hbvresult100, ccstat100fin, ccstat100fin2, exposed) %>% count()
 
 #Line num - ad pos Evaluate if mother or father is HBV+ ----------
 # label variable hv111    "Mother alive"
@@ -233,12 +257,13 @@ elig_kids_whbvres_wt_kr$fatherline <- paste(elig_kids_whbvres_wt_kr$hv001, elig_
 
 #  count of kids with living mother - unweighted and weighted
 elig_kids_whbvres_wt_kr %>% group_by(hv111) %>% count()
-svytotal(~as.factor(hv111), designf_dhs2, na.rm=T, survey.lonely.psu="adjust") 
+# svytotal(~as.factor(hv111), designf_dhs2, na.rm=T, survey.lonely.psu="adjust")  # need to run survey design first
 # count of kids with mother in study
 elig_kids_whbvres_wt_kr %>% group_by(hv112) %>% count()
-elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate(mothenr = case_when(hv112=="0" ~ 0, TRUE ~ 1))
+elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate(mothenr = case_when(hv112=="0" ~ 0, TRUE ~ 1), fathenr = case_when(hv114=="0" ~ 0, TRUE ~ 1))
 elig_kids_whbvres_wt_kr %>% group_by(mothenr, hv112) %>% count()
-svytotal(~as.factor(mothenr)+hv111, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") # 5089/(5089+494) = 91% of children have mothers enrolled in
+elig_kids_whbvres_wt_kr %>% group_by(fathenr, hv114) %>% count()
+#svytotal(~as.factor(mothenr)+hv111, designf_dhs2, na.rm=T, survey.lonely.psu="adjust") # 5089/(5089+494) = 91% of children have mothers enrolled in
 
 # need to draw in respondent line number when getting hbv results above 
 hhmemb5_slim2 <- hhmemb5 %>% select(c(adline, hbv_adcorr, dbsbarcode, hvidx, hv101))
@@ -253,6 +278,7 @@ momstest <- merge(elig_kids_whbvres_wt_kr[, c("cluster_hh", "clus_hh_ind", "kids
 fathertest <- merge(elig_kids_whbvres_wt_kr[, c("cluster_hh", "clus_hh_ind", "kids_barcode","hv101","hv105_fromhc1_f", "hbvresult5", "hbvresult1", "hbvresult2", "hbvresult100", "motherline","fatherline", "mothenr")],
                     hhmemb5_asfa2, by = "fatherline")
 nrow(momstest)
+nrow(fathertest)
 # n=642 or n=633 that merge with mother
 momstest %>% group_by(mothenr,hbvresult5, hbv_adcorr) %>% count()
 fathertest %>% group_by(hbvresult5, hbv_adcorr) %>% count()
@@ -296,18 +322,19 @@ adpos %>% group_by(shnprovin) %>% count() %>% print(n=Inf) # most are head of hh
 adpos %>% filter(n_posad5 > 1) %>% group_by(n_posad5, shnprovin) %>% count() # most are head of hh (38) or spouse of head (27). 22 are siblings of head of hh
 
 # Table 3 counts
-nrow(cc_kids5)
-nrow(cc_kids1)
-nrow(cc_kids100)
+# subset kids again
+cc_kids5_fin <- elig_kids_whbvres_wt_kr %>% filter(!is.na(ccstat5fin2))
+cc_kids1_fin <- elig_kids_whbvres_wt_kr %>% filter(!is.na(ccstat1fin2))
+cc_kids2_fin <- elig_kids_whbvres_wt_kr %>% filter(!is.na(ccstat2fin2))
+cc_kids100_fin <- elig_kids_whbvres_wt_kr %>% filter(!is.na(ccstat100fin2))
 
-cc_kids5 <- left_join(cc_kids5, ad_sum_clusthh[, c("cluster_hh", "n_posad5","n_ad_tested" )], by = "cluster_hh")
-cc_kids5 %>% group_by(ccstat5fin, n_posad5) %>% count()
-cc_kids5 <- cc_kids5 %>% mutate(exposed = case_when(n_posad5 >0 ~ 1,n_posad5==0 ~ 0))
-cc_kids5 %>% group_by(exposed, hbvresult5) %>% count()
-nrow(momstest)
+#cc_kids5_fin <- left_join(cc_kids5_fin, ad_sum_clusthh[, c("cluster_hh", "n_posad5","n_ad_tested" )], by = "cluster_hh")
+cc_kids5_fin %>% group_by(ccstat5fin2, n_posad5, exposed) %>% count()
+#cc_kids5 <- cc_kids5 %>% mutate(exposed = case_when(n_posad5 >0 ~ 1,n_posad5==0 ~ 0))
+cc_kids5_fin %>% group_by(exposed, hbvresult5) %>% count()
+
 # get exposure is pos mother
-cc_kids5 <- cc_kids5 %>% mutate(mothenr = case_when(hv112=="0" ~ 0, TRUE ~ 1))
-cc_kids5m <- merge(cc_kids5[, c("cluster_hh", "clus_hh_ind", "kids_barcode", "hv101","hv105_fromhc1_f","hbvresult5", "hbvresult1", "hbvresult2", "hbvresult100", "motherline","fatherline","mothenr")], hhmemb5_asmom2, by = "motherline")
+cc_kids5m <- merge(cc_kids5_fin[, c("cluster_hh", "clus_hh_ind", "kids_barcode", "hv101","hv105_fromhc1_f","hbvresult5", "hbvresult1", "hbvresult2", "hbvresult100", "motherline","fatherline","mothenr")], hhmemb5_asmom2, by = "motherline")
 cc_kids5m %>% group_by(mothenr,hbvresult5, hbv_adcorr) %>% count()
 nrow(cc_kids5m)
 cc_kids5m$hasmom <- 1
@@ -318,27 +345,25 @@ cc_kids5m <- cc_kids5m %>% mutate(exp_moth = case_when(
 ))
 table(cc_kids5m$exp_moth)  
 
-cc_kids5 <- left_join(cc_kids5, cc_kids5m[,c("clus_hh_ind", "hasmom", "exp_moth")], by = "clus_hh_ind")
-nrow(cc_kids5)                  
-cc_kids5 %>% group_by(hasmom) %>% count()
-cc_kids5 %>% group_by(exp_moth, hbvresult5) %>% count()
+cc_kids5_fin2 <- left_join(cc_kids5_fin, cc_kids5m[,c("clus_hh_ind", "hasmom", "exp_moth")], by = "clus_hh_ind")
+nrow(cc_kids5_fin2)                  
+cc_kids5_fin2 %>% group_by(hasmom) %>% count()
+cc_kids5_fin2 %>% group_by(exp_moth, hbvresult5) %>% count()
 
 # Final case-control dataset--------------
-# remove kids in the same household as cases
-cc_kids5_2 <- cc_kids5 %>% filter(!(ccstat5fin==1 & hbvresult5==0))
-nrow(cc_kids5_2)
-cc_kids5_2 %>% group_by(ccstat5fin) %>% count()
+cc_kids5_fin2 %>% group_by(hbvresult5, ccstat5fin, ccstat5fin2, exposed ) %>% count()
 # households with hh result
-cc_kids5_2 %>% group_by(ccstat5fin, exposed) %>% summarise(n_distinct(cluster_hh))
-cc_kids5_2 %>% group_by(ccstat5fin, exposed) %>% count()
-cc_kids5_2 %>% filter(!is.na(exposed))  %>% group_by(ccstat5fin) %>% count()
-cc_kids5_2 %>% filter(!is.na(exposed))  %>% group_by(ccstat5fin) %>% summarise(n_distinct(cluster_hh))
+cc_kids5_fin2 %>% group_by(ccstat5fin2, exposed) %>% summarise(n_distinct(cluster_hh))
+cc_kids5_fin2 %>% group_by(ccstat5fin2, exposed) %>% count()
+cc_kids5_fin2 %>% filter(!is.na(exposed))  %>% group_by(ccstat5fin) %>% count()
+cc_kids5_fin2 %>% filter(!is.na(exposed))  %>% group_by(ccstat5fin) %>% summarise(n_distinct(cluster_hh))
 
-### look at distribution of weights---------
-summary(cc_kids5_2$both_wt_new)
-summary(cc_kids5_2$both_wt_old)
-summary(cc_kids5_2$iptw_s)
-summary(cc_kids5_2$hv028_div)
+##Case-control Tab1------------
+### look at distribution of weights
+summary(cc_kids5_fin2$both_wt_new)
+summary(cc_kids5_fin2$both_wt_old)
+summary(cc_kids5_fin2$iptw_s)
+summary(cc_kids5_fin2$hv028_div)
 summary(elig_kids_whbvres_wt_kr$iptw_s)
 summary(elig_kids_whbvres_wt_kr$both_wt_new)
 summary(elig_kids_whbvres_wt_kr$hv028_div)
@@ -347,11 +372,11 @@ elig_kids_2 %>% summarise(mean(as.numeric(hv028)/1000000), median(as.numeric(hv0
 table(elig_kids_2$shteta, useNA = "always")
 elig_kids_2 %>% group_by(hc1) %>% count(shteta)
 
-cc_kids5_2$exposed <- as.factor(cc_kids5_2$exposed)
-cc_kids5_2$exp_moth <- as.factor(cc_kids5_2$exp_moth)
+cc_kids5_fin2$exposed <- as.factor(cc_kids5_fin2$exposed)
+cc_kids5_fin2$exp_moth <- as.factor(cc_kids5_fin2$exp_moth)
 
 # make case control pop a survey object
-designf_cc <-svydesign(ids=cc_kids5_2$hv001, strata=cc_kids5_2$hv022 , weights=cc_kids5_2$both_wt_new,  data=cc_kids5_2) # which weight: hv028_div, both_wt_new
+designf_cc <-svydesign(ids=cc_kids5_fin2$hv001, strata=cc_kids5_fin2$hv022 , weights=cc_kids5_fin2$both_wt_new,  data=cc_kids5_fin2) # which weight: hv028_div, both_wt_new
 options(survey.lonely.psu="adjust")
 designf_dhs2cc <-as_survey_design(designf_cc)
 
@@ -360,44 +385,60 @@ designf_dhs2cc <-as_survey_design(designf_cc)
 survtable <- function(var){ 
   svyby(as.formula(paste0('~', var)),~hbvresult5, designf_dhs2cc, svytotal, na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
 }
+# mean for continuos vars in dataset, stratified by HBV Y or N
+survmean <- function(var){ 
+  svyby(as.formula(paste0('~', var)),~hbvresult5, designf_dhs2cc, svymean, na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
+}
+# numeric vars
+age_numcc <- as.data.frame(survmean("hc1")) %>% rownames_to_column(var = "cov")  %>%  
+  mutate(levels = "Age (months), mean (SD)") %>% rename(mean = hc1)
+hhmem_cc <- as.data.frame(survmean("hv009")) %>% rownames_to_column(var = "cov")  %>%  
+  mutate(levels = "Household members, mean (SD)") %>% rename(mean = hv009)
+kids_cc <- as.data.frame(survmean("hv014")) %>% rownames_to_column(var = "cov")  %>%  
+  mutate(levels = "Children in household, mean (SD)") %>% rename(mean = hv014)
+avgs_totcc <- dplyr::bind_rows(list(age_numcc, hhmem_cc, kids_cc), .id = 'source') %>% mutate(Tab1tot = paste(round(mean,1),' (',round(se,2),')', sep = ""))
+Tab1_num_cc <- avgs_totcc %>% mutate(hbvresult5_lab = case_when(hbvresult5 == 0 ~ "Tab1_ctrl",
+                                                                 hbvresult5 == 1 ~ "Tab1_cc")) %>% 
+  select(-c(source, cov, mean, se, hbvresult5)) %>% pivot_wider(names_from = c(hbvresult5_lab), values_from =  Tab1tot)
+view(Tab1_num_cc)
 
-age <- as.data.frame(t(as.data.frame(survtable("hv105_fromhc1_f")))) %>% rownames_to_column(var = "covname") %>% 
+agecc <- as.data.frame(t(as.data.frame(survtable("hv105_fromhc1_f")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "hv105_fromhc1_f", 2)[,2], cov = "hv105_fromhc1_f") 
 # Sex 0=female, 1=male
-sex <- as.data.frame(t(as.data.frame(survtable("sex")))) %>% rownames_to_column(var = "covname") %>% 
+sexcc <- as.data.frame(t(as.data.frame(survtable("sex")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "sex", 2)[,2], cov = "sex") 
 # relationship to head of household
-relhh <- as.data.frame(t(as.data.frame(survtable("reltoheadhh_simp")))) %>% rownames_to_column(var = "covname") %>% 
+relhhcc <- as.data.frame(t(as.data.frame(survtable("reltoheadhh_simp")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "reltoheadhh_simp", 2)[,2], cov = "reltoheadhh_simp") 
 # urban rural:  hv025=urban(1)/rural(2)
-urbrur <- as.data.frame(t(as.data.frame(survtable("urbanrural")))) %>% rownames_to_column(var = "covname") %>% 
+urbrurcc <- as.data.frame(t(as.data.frame(survtable("urbanrural")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "urbanrural", 2)[,2], cov = "urbanrural") 
 # type of location hv026: 0=capital (provincial); 1=small city; 2=town; 3=countryside
-location <- as.data.frame(t(as.data.frame(survtable("location")))) %>% rownames_to_column(var = "covname") %>% 
+locationcc <- as.data.frame(t(as.data.frame(survtable("location")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "location", 2)[,2], cov = "location")  
 # province
-prov <- as.data.frame(t(as.data.frame(survtable("prov2015")))) %>% rownames_to_column(var = "covname") %>% 
+provcc <- as.data.frame(t(as.data.frame(survtable("prov2015")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "prov2015", 2)[,2], cov = "prov2015")  
 # household wealth
-wealth <- as.data.frame(t(as.data.frame(survtable("wealth")))) %>% rownames_to_column(var = "covname") %>% 
+wealthcc <- as.data.frame(t(as.data.frame(survtable("wealth")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "wealth", 2)[,2], cov = "wealth") 
 #pf malaria
-pfmal <- as.data.frame(t(as.data.frame(survtable("pfmalaria")))) %>% rownames_to_column(var = "covname") %>% 
+pfmalcc <- as.data.frame(t(as.data.frame(survtable("pfmalaria")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "pfmalaria", 2)[,2], cov = "pfmalaria") 
 # tetanus - variable from dataset
-tetorig <- as.data.frame(t(as.data.frame(survtable("tetab")))) %>% rownames_to_column(var = "covname") %>% 
+tetorigcc <- as.data.frame(t(as.data.frame(survtable("tetab")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "tetab", 2)[,2], cov = "tetab") 
-anem <- as.data.frame(t(as.data.frame(survtable("anemia_f")))) %>% rownames_to_column(var = "covname") %>% 
+anemcc <- as.data.frame(t(as.data.frame(survtable("anemia_f")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "anemia_f", 2)[,2], cov = "anemia_f") 
-modstu <- as.data.frame(t(as.data.frame(survtable("modstunt_f")))) %>% rownames_to_column(var = "covname") %>% 
+modstucc <- as.data.frame(t(as.data.frame(survtable("modstunt_f")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "modstunt_f", 2)[,2], cov = "modstunt_f") 
-dpt_dos <- as.data.frame(t(as.data.frame(survtable("dpt_doses_f")))) %>% rownames_to_column(var = "covname") %>% 
+dpt_doscc <- as.data.frame(t(as.data.frame(survtable("dpt_doses_f")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "dpt_doses_f", 2)[,2], cov = "dpt_doses_f") 
-inje <- as.data.frame(t(as.data.frame(survtable("injec_f")))) %>% rownames_to_column(var = "covname") %>% 
+injecc <- as.data.frame(t(as.data.frame(survtable("injec_f")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "injec_f", 2)[,2], cov = "injec_f") 
-beat <- as.data.frame(t(as.data.frame(survtable("beat_f")))) %>% rownames_to_column(var = "covname") %>% 
+beatcc <- as.data.frame(t(as.data.frame(survtable("beat_f")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "beat_f", 2)[,2], cov = "beat_f") 
-reused <- as.data.frame(t(as.data.frame(survtable("v480")))) %>% rownames_to_column(var = "covname") %>% 
+reusedcc <- as.data.frame(t(as.data.frame(survtable("v480")))) %>% rownames_to_column(var = "covname") %>% 
   mutate(levels = str_split_fixed(covname, "v480", 2)[,2], cov = "v480") 
 
 exposure <- as.data.frame(t(as.data.frame(survtable("exposed")))) %>% rownames_to_column(var = "covname") %>% 
@@ -406,19 +447,25 @@ exp_mom <- as.data.frame(t(as.data.frame(survtable("exp_moth")))) %>% rownames_t
   mutate(levels = str_split_fixed(covname, "exp_moth", 2)[,2], cov = "exp_moth") 
 #add counts for number of positive adults? npos_ad
 
-view(exposure)
-
-all_cc <- dplyr::bind_rows(list(age, sex, relhh, urbrur, location, prov, wealth, pfmal, tetorig, anem, modstu, dpt_dos, inje, beat, reused, exposure, exp_mom)) %>% 
+all_cc <- dplyr::bind_rows(list(agecc, sexcc, relhhcc, urbrurcc, locationcc, wealthcc, pfmalcc, tetorigcc, anemcc, modstucc, dpt_doscc, injecc, beatcc, reusedcc, provcc, exposure, exp_mom)) %>% 
   filter(!grepl("se\\.", covname) & !grepl("hbvresult5", covname))
 view(all_cc)
 colnames(all_cc)[2] <- "controls"
 colnames(all_cc)[3] <- "cases"
 all_cc <- all_cc %>% group_by(cov) %>% mutate(total_case = sum(cases), total_control = sum(controls), totperc_case = 100*(cases / total_case), totperc_ctrl = 100*(controls / total_control))  %>% ungroup()
 tab_cc <- all_cc %>% mutate_if(is.numeric, round, 0) %>% mutate(Tab1_cc = paste(cases,' (',totperc_case,')',  sep = ""),Tab1_ctrl = paste(controls,' (',totperc_ctrl,')',  sep = "") )
-view(tab_cc)
-tabcc_s <- tab_cc %>% select(c("cov", "levels", "Tab1_cc", "Tab1_ctrl"))
-write.csv(tabcc_s, file = "~/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/K manuscript/tabcc.csv")
+# drop rows
+drop = c("sexFemale", "urbanruralUrban", "pfmalariaPf-negative", "tetabNonreactive", "tetabIndeterminate","anemia_fMild-to-none", "anemia_fNot available", "modstunt_fNo stunting", "modstunt_fNot available", "v4808")
+tab_cc2 <- tab_cc %>%
+  filter(!covname %in% drop ) %>% 
+  select(c("covname","levels", "Tab1_cc", "Tab1_ctrl"))
+tab1_cc <- dplyr::bind_rows(list(Tab1_num_cc, tab_cc2)) %>% relocate(c("covname","levels", "Tab1_cc"))
 
+##ExportCC Tab1-----
+view(tab1_cc)
+write.csv(tab1_cc, file = here("Data", "tab1cc.csv"))
+
+#Table 3-------
 svyby(~as.factor(exposed),~hbvresult5 , designf_dhs2cc, svytotal,na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
 
 ad_hbs <- svyglm(hbvresult5~as.factor(exposed), designf_dhs2cc, family=quasibinomial("logit"))
@@ -429,65 +476,8 @@ exp(confint(ad_hbs))
 # has mother who is hbsag+
 svyby(~as.factor(exp_moth),~hbvresult5 , designf_dhs2cc, svytotal,na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
 
-ad_hbs <- svyglm(hbvresult5~as.factor(exp_moth), designf_dhs2cc, family=quasibinomial("logit"))
-summary(ad_hbs)
-exp(ad_hbs$coefficients)
-exp(confint(ad_hbs))
+ad_hbsm <- svyglm(hbvresult5~as.factor(exp_moth), designf_dhs2cc, family=quasibinomial("logit"))
+summary(ad_hbsm)
+exp(ad_hbsm$coefficients)
+exp(confint(ad_hbsm))
 
-#Table of kids included in the nested case-control study-----------
-#which weights to use
-#cases_cc_kids5
-table(outcome = cc_kids5$hbvresult5, casecon = cc_kids5$ccstat5fin)
-
-
-# counts for all n in dataset
-survtable_all <- function(var){ 
-  svytotal(as.formula(paste0('~', var)), designf_dhs2, na.rm=T, survey.lonely.psu="adjust") # %>% clipr::write_clip()
-}
-# Age
-age_s2 <- as.data.frame(survtable_all("hv105_fromhc1_f")) %>% rownames_to_column(var = "covname") %>%  mutate(levels = str_split_fixed(covname, "hv105_fromhc1_f", 2)[,2], cov = "hv105_fromhc1_f") 
-# Sex 0=female, 1=male
-sex_s2 <- as.data.frame(survtable_all("sex")) %>% rownames_to_column(var = "covname") %>% mutate(levels = str_split_fixed(covname, "sex", 2)[,2], cov = "sex") 
-# relationship to head of household
-relhh_s2 <- as.data.frame(survtable_all("reltoheadhh_simp")) %>% rownames_to_column(var = "covname") %>% mutate(levels = str_split_fixed(covname, "reltoheadhh_simp", 2)[,2], cov = "reltoheadhh_simp") 
-# urban rural:  hv025=urban(1)/rural(2)
-urbrur_s2 <- as.data.frame(survtable_all("urbanrural")) %>% rownames_to_column(var = "covname") %>% mutate(levels = str_split_fixed(covname, "urbanrural", 2)[,2], cov = "urbanrural") 
-# type of location hv026: 0=capital (provincial); 1=small city; 2=town; 3=countryside
-location_s2 <- as.data.frame(survtable_all("location")) %>% rownames_to_column(var = "covname") %>% mutate(levels = str_split_fixed(covname, "location", 2)[,2], cov = "location")  
-# province
-prov_s2 <- as.data.frame(survtable_all("prov2015")) %>% rownames_to_column(var = "covname") %>% mutate(levels = str_split_fixed(covname, "prov2015", 2)[,2], cov = "prov2015")  
-# household wealth
-wealth_s2 <- as.data.frame(survtable_all("wealth")) %>% rownames_to_column(var = "covname") %>% mutate(levels = str_split_fixed(covname, "wealth", 2)[,2], cov = "wealth") 
-#pf malaria
-pfmal_s2 <- as.data.frame(survtable_all("pfmalaria")) %>% rownames_to_column(var = "covname") %>% mutate(levels = str_split_fixed(covname, "pfmalaria", 2)[,2], cov = "pfmalaria") 
-# tetanus - variable from dataset
-tetorig_s2 <- as.data.frame(survtable_all("tetab")) %>% rownames_to_column(var = "covname") %>% mutate(levels = str_split_fixed(covname, "tetab", 2)[,2], cov = "tetab") 
-
-all_tot_s2 <- dplyr::bind_rows(list(age_s2, sex_s2, relhh_s2, urbrur_s2, location_s2, prov_s2, wealth_s2, pfmal_s2, tetorig_s2), .id = 'source') #tetlower, tetupper,
-all_tot_s2 <- all_tot_s2 %>% filter(total>0) %>% select(-SE)
-all_tot_s2 <- all_tot_s2 %>% group_by(source) %>% mutate(totperc = 100*(total / sum(total)))  %>% ungroup()
-all_tot_s2 <- all_tot_s2 %>% rename(total_5k = total, totperc_5k = totperc) %>% select(c("covname", "levels", "total_5k", "totperc_5k"))
-
-all_supp <- merge(all_tot_s, all_tot_s2, by = c("covname", "levels"))
-view(all_supp)
-
-#removing cases living with other cases---------------
-
-nrow(cc_kids5_2)
-table(cc_kids5_2$ccstat5fin)
-table(cc_kids5_2$poskids)
-cc_kids5_2 %>% group_by(poskids, ccstat5fin) %>% count()
-cc_kids5_2 %>% filter(poskids == '2') %>% reframe(poskids, cluster_hh, sex, hv105_fromhc1_f, prov2015, exposed, exp_moth)
-# one kid
-table(cc_kids5_2$poskids2)
-cc_kids5_2$poskids <- as.numeric(cc_kids5_2$poskids)
-cc_kids5_2$poskids2 <- cc_kids5_2$poskids -1
-
-cc_kids5_3 <- cc_kids5_2 %>% filter(poskids2 < 2)
-nrow(cc_kids5_3)
-table(cc_kids5_3$poskids2)
-
-# make case control pop a survey object
-designf_cc <-svydesign(ids=cc_kids5_3$hv001, strata=cc_kids5_3$hv022 , weights=cc_kids5_3$both_wt_new,  data=cc_kids5_3) # which weight: hv028_div, both_wt_new
-options(survey.lonely.psu="adjust")
-designf_dhs2cc <-as_survey_design(designf_cc)
