@@ -256,8 +256,22 @@ tot_by <- tot_by %>% select(-covname) %>% relocate(cov, levels)
 tot_by$Tab2prevci <- ""  # no prev diff for overall, but need var on dataframe for Tab2 merge
 tot_by$total <- as.numeric(tot_by$total)
 
+#overall sag positivity sco5
 prop.table(svytable(~hbvresult5, designf_dhs2))
 svyciprop(~hbvresult5,  designf_dhs2, method="lo")
+#sco1
+survtable_all("hbvresult1") 
+prop.table(svytable(~hbvresult1, designf_dhs2))
+svyciprop(~hbvresult1,  designf_dhs2, method="lo")
+#sco2
+survtable_all("hbvresult2") 
+prop.table(svytable(~hbvresult2, designf_dhs2))
+svyciprop(~hbvresult2,  designf_dhs2, method="lo")
+#sco100
+survtable_all("hbvresult100") 
+prop.table(svytable(~hbvresult100, designf_dhs2))
+svyciprop(~hbvresult100,  designf_dhs2, method="lo")
+
 
 ## hbv n onto by df-----
 all_byct <- dplyr::bind_rows(list(tot_by, all_byc2))
