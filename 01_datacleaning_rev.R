@@ -513,14 +513,20 @@ elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% dplyr::mutate(
       is.na(beat) ~ "Not available"))
 
 # positives by household
-poskids <- elig_kids_whbvres_wt_kr %>% group_by(cluster_hh) %>% 
+poskidsdf <- elig_kids_whbvres_wt_kr %>% group_by(cluster_hh) %>% 
   summarize(poskids = sum(hbvresult5), 
             nkids = n(), 
             percpos = round(100*(poskids/nkids),2))
-
-elig_kids_whbvres_wt_kr <- left_join(elig_kids_whbvres_wt_kr, poskids[,c("cluster_hh","poskids", "nkids","percpos")], by ="cluster_hh")
+view(poskidsdf)
+poskidsdf %>% filter(poskids >1) %>% reframe()
+elig_kids_whbvres_wt_kr <- left_join(elig_kids_whbvres_wt_kr, poskidsdf[,c("cluster_hh","poskids", "nkids","percpos")], by ="cluster_hh")
 elig_kids_whbvres_wt_kr %>% group_by(percpos, poskids) %>% count()
 
 elig_kids_whbvres_wt_kr$hv014 <- as.numeric(elig_kids_whbvres_wt_kr$hv014)
 elig_kids_whbvres_wt_kr$poskids <- as.factor(elig_kids_whbvres_wt_kr$poskids)
+
+# export for DHS program--------
+library(here)
+kidshbv <- elig_kids_whbvres_wt_kr %>% select(c(hv001, hv002, kids_barcode, hbvresult5, hbvresult1, hbvresult2, hbvresult100))
+write.csv(kidshbv, file = here("Data", "kidshbv.csv"))
 

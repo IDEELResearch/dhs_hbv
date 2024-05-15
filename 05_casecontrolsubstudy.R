@@ -121,8 +121,13 @@ adults4mrg$hbv_adcorr <- adults4mrg$hbv - 1
 adults4mrg %>% group_by(hbv) %>% count()
 adults4mrg %>% group_by(hbv_adcorr) %>% count()
 
-hhmemb5 %>% filter(eligtesting==1 & consent_add==1) %>% group_by()
+hhmemb5 %>% filter(eligtesting==1 & consent_add==1) %>% group_by(hbv_adcorr) %>% count()
 hhmemb5 <- left_join(hhmemb5,adults4mrg[,c("dbsbarcode", "hbv_adcorr", "clus_hh_ind")], by = "dbsbarcode")
+# save hh member results
+hhmemb5_save <- hhmemb5 %>% filter(!is.na(hbv_adcorr) & consent_add==1) %>% select(c(hv001, hv002, dbsbarcode, ha64, hb64, consent_add,hbv_adcorr))
+nrow(hhmemb5_save)
+hhmemb5_save %>% group_by(ha64, hb64) %>% count()
+write.csv(hhmemb5_save, file = here("Data", "hhmemb5_save.csv"))
 
 #sum pos counts at hh level
 ad_sum_clusthh <- 
@@ -169,6 +174,7 @@ hhmemb5 %>% filter(eligtesting == 1 & bc_coll==1 & consent_add==1 & is.na(hbv_ad
 hhmemb5 %>% filter(eligtesting == 1 & bc_coll==1 & consent_add==1 & is.na(hbv_adcorr)) %>% group_by(pfldh_adult) %>% count()
 adnohbv <- hhmemb5 %>% filter(eligtesting == 1 & bc_coll==1 & consent_add==1 & is.na(hbv_adcorr)) %>% select(c(dbsbarcode, clus_hh_ind, cluster_hh, pfldh_adult, ccstat5fin))
 nrow(adnohbv)
+table(hhmemb5$ccstat5fin,hhmemb5$hbv_adcorr)
 
 # import results from hbsag testing with notes about samples
 hhresults <- read_excel(here("Data", "allhhmemtotest_res.xlsx"), sheet = "Sheet1")

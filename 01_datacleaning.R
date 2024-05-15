@@ -94,7 +94,7 @@ addmargins(table(kidresults$catresult, useNA = "always"))
 table(kidresults$catresult, kidresults$round1call,useNA = "always")
 table(kidresults$catresult, kidresults$round2call,useNA = "always")
 
-
+adultresults %>% filter(sco >1 & sco <100)  %>% group_by(sco, catresult) %>% count() %>% print(n=Inf)
 # strip lab results to bare minimum
 adults_trim <- adultresults[,c("dbsbarcode", "catresult", "agegrp")]
 kids_trim <- kidresults[,c("dbsbarcode", "catresult", "agegrp")]

@@ -257,6 +257,7 @@ tot_by$Tab2prevci <- ""  # no prev diff for overall, but need var on dataframe f
 tot_by$total <- as.numeric(tot_by$total)
 
 #overall sag positivity sco5
+survtable_all("hbvresult5") 
 prop.table(svytable(~hbvresult5, designf_dhs2))
 svyciprop(~hbvresult5,  designf_dhs2, method="lo")
 #sco1
