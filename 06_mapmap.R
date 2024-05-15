@@ -168,14 +168,30 @@ sexprov5tp <- sexprov5t %>% mutate(
   boysp = 100*(hbv1.Male/(hbv0.Male + hbv1.Male)),
   girlsp = 100*(hbv1.Female/(hbv0.Female + hbv1.Female)),
   pd = boysp - girlsp)
-view(sexprov5tp)
+
+#add CIs for each prov PD
+sexprov5tp <- sexprov5tp %>% mutate(
+  n1 = hbv1.Male + hbv0.Male, # total count of boys
+  n2 = hbv1.Female + hbv0.Female, # total count of girls
+  p1 = boysp/100,
+  p2 = girlsp/100,
+  term_undersq = case_when(
+    boysp == 0 & girlsp == 0 ~ 0, #both reactive and nonreactive proportions are zero
+    #boysp == 0 & girlsp != 0 ~ (0+(p2*(1-p2)/n2)),
+    TRUE ~ (p1*(1-p1)/n1)+(p2*(1-p2)/n2)),
+  sq_term = sqrt(term_undersq),
+  pd_lci = 100*((p1 - p2) - 1.96*sq_term),
+  pd_uci = 100*((p1 - p2) + 1.96*sq_term))
+
+colnames(sexprov5tp)
+
 sexprov5tp$hyphen <- gsub("prov2015", "", sexprov5tp$level)
 
-sexprov5tpm <- sexprov5tp %>%  select(c(hyphen, boysp,girlsp, pd)) #%>% melt()
+#sexprov5tpm <- sexprov5tp %>%  select(c(hyphen, boysp,girlsp, pd)) #%>% melt()
 view(sexprov5tpm)
 sexprov5tpm %>% group_by(pd) %>% count() %>% print(n=Inf)
 
-sexprov5tpm <- sexprov5tpm %>% mutate(
+sexprov5tpm <- sexprov5tp %>% mutate(
   pdsex_g = case_when(
     pd < -2 ~ 0, #Girls 2+ more infections
     pd >= -2  & pd < -1 ~ 1, # Girls 1+ more infections
@@ -192,14 +208,35 @@ sexprov5tpm <- sexprov5tpm %>% mutate(
   pdsex_gf = factor(pdsex_g,
                     levels = c(0,1,2,3,4,5,6,7,8,9,10,11),
                     labels = c("Girls 2+ more", "Girls 1 more",  "No difference (0% prev in both)", "No difference (prev >0%)", "Boys 1 more", "Boys 2 more"  ,"Boys 3 more", "Boys 4 more", "Boys 5 more", "Boys 6 more", "Boys 7+ more", "Boys 8+ more")))
-table(sexprov5tpm$pdsex_gf, useNA = "always") # need 2 orange for girls, 1 white, 5 purple for boys
+table(sexprov5tpm$pdsex_g, useNA = "always") # need 2 orange for girls, 1 white, 5 purple for boys
+
+sexprov5tpm %>% 
+  mutate(hyphen = reorder(hyphen, pd)) %>% 
+  ggplot(aes(x=hyphen, y=pd)) +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_pointrange(aes(x=hyphen, y=pd, ymin=pd_lci, ymax=pd_uci), shape=15, size=0.8, color="black", show.legend=T, fatten=0.2, position=position_dodge2(width = 0.5) ) + 
+  geom_point(shape=15, size=5, aes(color=pdsex_gf, group=pdsex_gf), position=position_dodge2(width = 0.5) , show.legend=T) + #alpha=0.9
+  scale_color_manual(values = sexpuor)+
+  #scale_color_brewer(palette = "Dark2")+
+  coord_flip() + theme_bw() +
+  #  scale_alpha_discrete(range = c(0.35, 0.9))+
+  #scale_x_continuous(trans = "reverse") + 
+  labs(x="", y="HBsAg-positivity prevalence difference by province: Boys vs girls") + 
+  theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
+        axis.ticks.y=element_blank(),
+        panel.grid.minor=element_blank())
++ guides(color="none")
+ggsave('./Plots/provsexpd_forest.png', width=9, height=6)
+
+
 drcprovpdsex_sf <- left_join( drcprov[,c("hyphen", "geometry")], sexprov5tpm, by="hyphen")
 
 library(RColorBrewer)
 brewer.pal(n = 9, "PuOr")[1:9] #there are 9, I exluded the two lighter hues
  # using chrome.hs, get 16 of this palette for 8 on either side, then choose nth for each
- c('#e08214', '#e68d29', '#ec993b', '#f2a44d', '#f7b05f', '#fabb72', '#fdc787', '#ffd49e', "#F7F7F7",'#a49bc8', '#988bbe', '#8c7bb4', '#806aab', '#755aa2', '#6a4a99', '#5f3990', '#542788' )
-sexpuor <- c('#f7b05f', '#ffd49e', "lightgray","#F7F7F7",'#a49bc8', '#8c7bb4', '#755aa2', '#6a4a99','#542788' )
+c('#e08214', '#e68d29', '#ec993b', '#f2a44d', '#f7b05f', '#fabb72', '#fdc787', '#ffd49e', "#F7F7F7",'#a49bc8', '#988bbe', '#8c7bb4', '#806aab', '#755aa2', '#6a4a99', '#5f3990', '#542788' )
+c('#e08214',  '#fdc787', '#fdc787',  "lightgray", "#F7F7F7",'#a49bc8', '#988bbe', '#8c7bb4', '#806aab', '#755aa2', '#6a4a99', '#5f3990', '#542788' )
+sexpuor <- c('#f7b05f', '#ffd49e', "snow4","seashell2",'#a49bc8', '#8c7bb4', '#755aa2', '#6a4a99','#542788' )
 
 sexpds <-
   ggplot()+
@@ -449,12 +486,49 @@ provtet5t <- provtet5t %>% mutate(
   pdtet_gf = factor(pdtet_g,
                     levels = c(0,1,2,3,4,5,6,7,8),
                     labels = c("Tetanus sero-neg 5+ more", "Tetanus sero-neg 4 more",  "Tetanus sero-neg 3 fewer", "Tetanus sero-neg 2 more", "Tetanus sero-neg 1 more"  ,"No difference (prev 0% in both)", "No difference (prev >0%)","Tetanus sero-pos 1 more", "Tetanus sero-pos 2+ more")))
+colnames(provtet5t)
+sqrt(((provtet5t$Reactive_p/100)*(1-(provtet5t$Reactive_p/100))/provtet5t$hbv1.Reactive)+((provtet5t$Nonreactive_p/100)*(1-(provtet5t$Nonreactive_p/100))/provtet5t$hbv1.Nonreactive))
 
-view(provtet5t)
+provtet5t <- provtet5t %>% mutate(
+  n1 = hbv1.Reactive + hbv0.Reactive, # total count of seropositives
+  n2 = hbv1.Nonreactive + hbv0.Nonreactive, # total count of seronegatives
+  p1 = Reactive_p/100,
+  p2 = Nonreactive_p/100,
+  term_undersq = case_when(
+    Reactive_p == 0 & Nonreactive_p == 0 ~ 0, #both reactive and nonreactive proportions are zero
+    Reactive_p == 0 & Nonreactive_p != 0 ~ (0+(p2*(1-p2)/n2)),
+    Reactive_p != 0 & Nonreactive_p != 0 ~ (p1*(1-p1)/n1)+(p2*(1-p2)/n2)),
+  sq_term = sqrt(term_undersq),
+  pdtet_lci = 100*((p1 - p2) - 1.96*sq_term),
+  pdtet_uci = 100*((p1 - p2) + 1.96*sq_term))
+table(provtet5t$pdtet_gf)
+
+#forest plot
+provtet5t %>% 
+  mutate(hyphen = reorder(hyphen, pdtet)) %>% 
+  ggplot(aes(x=hyphen, y=pdtet)) +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_pointrange(aes(x=hyphen, y=pdtet, ymin=pdtet_lci, ymax=pdtet_uci), shape=15, size=0.8, color="black", show.legend=T, fatten=0.2, position=position_dodge2(width = 0.5) ) + 
+  geom_point(shape=15, size=5, aes(color=pdtet_gf, group=pdtet_gf), position=position_dodge2(width = 0.5) , show.legend=T) + #alpha=0.9
+  scale_color_manual(values = blrd10)+
+  #scale_color_brewer(palette = "Dark2")+
+  coord_flip() + theme_bw() +
+  #  scale_alpha_discrete(range = c(0.35, 0.9))+
+  #scale_x_continuous(trans = "reverse") + 
+  labs(x="", y="HBsAg-positivity prevalence difference by province: Tetanus seropositive vs seronegative") + 
+  theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
+        axis.ticks.y=element_blank(),
+        panel.grid.minor=element_blank())
++ guides(color="none")
+ggsave('./Plots/provtetpd_forest.png', width=9, height=6)
+
+
+colnames(provtet5t)
 
 n11colorpigr <- c("#8e0152", "#c51b7d", "#de77ae", "#f1b6da", "#fde0ef", "#f7f7f7", "#e6f5d0", "#b8e186", "#7fbc41", "#4d9221", "#276419")
 n11colorrdbl <- c('#93003a', '#c52a52', '#e75d6f', '#fd9291', '#ffcab9', '#ffffe0', '#b1dfdb', '#85b7ce', '#618fbf', '#3e67ae', '#00429d')
-n11colorblrd <- c('#00429d', '#3e67ae', '#618fbf', '#85b7ce', '#b1dfdb',"#f7f7f7", '#ffffe0', '#ffcab9', '#fd9291','#e75d6f',  '#c52a52', '#93003a')
+n11colorblrd <- c('#00429d', '#3e67ae', '#618fbf', '#85b7ce', '#b1dfdb',"snow2", '#ffffe0', '#ffcab9', '#fd9291','#e75d6f',  '#c52a52', '#93003a')
+blrd10 <- c('#00429d', '#3e67ae', '#618fbf', '#85b7ce', '#b1dfdb',"snow4","palegoldenrod", '#fd9291','#e75d6f',  '#c52a52', '#93003a')
 
 provtet5t$hyphen <- gsub("prov2015", "", provtet5t$level)
 drcprov_tet <- left_join( drcprov[,c("hyphen", "geometry")], provtet5t, by="hyphen")

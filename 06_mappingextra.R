@@ -146,7 +146,7 @@ output_df <- kidsmap_impsf %>%
           prev100_grp_f = factor(prev100_grp,
              levels = c(0,1,2,3,4),
              labels = c("0%", ">0-5%", ">5-10%", ">10-15%",">15%")))
-
+output_df %>% group_by(prev_grp_f) %>% summarise(count1 = n(), count = n() / nrow(.))
 # for subset with dpt reporting
 dpt <- kidsmap_impsf %>% filter(!is.na(dpt_count)) %>% 
   group_by(hv001) %>%
