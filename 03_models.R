@@ -122,9 +122,12 @@ glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f2"] <- "2 years vs <1 yea
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f3"] <- "3 years vs <1 year"
 glmresults_5$term[glmresults_5$term == "hv105_fromhc1_f4"] <- "4 years vs <1 year"
 glmresults_5$term[glmresults_5$term == "sexMale"] <- "Male vs Female"
+glmresults_5$term[glmresults_5$term == "Male vs Female"] <- "Sex: Male vs female"
 #glmresults_5$term[glmresults_5$term == "hv1042"] <- "Female vs male"
 glmresults_5$term[glmresults_5$term == "reltoheadhh_simpGrandchild"] <- "Grandchild vs child"
 glmresults_5$term[glmresults_5$term == "reltoheadhh_simpOther"] <- "Other vs child"
+glmresults_5$term[glmresults_5$term == "Grandchild vs child"] <- "Relationship to head of household: Grandchild vs child"
+glmresults_5$term[glmresults_5$term == "Other vs child"] <- "Relationship to head of household: Other vs child"
 
 glmresults_5$term[glmresults_5$term == "tetabReactive"] <- "Tetanus Ab+ vs -"
 glmresults_5$term[glmresults_5$term == "dpt_doses_fNot available"] <- "Not available"
@@ -174,7 +177,7 @@ glmresults_5$term[glmresults_5$term == "provgrp_kin7"] <- "Kivus vs Kinshasa"
 glmresults_5$term[glmresults_5$term == "provgrp_kin8"] <- "Maniema vs Kinshasa"
 table(glmresults_5$term)
 view(glmresults_5)
-
+table(glmresults_5$grp)
 glmresults_5 <- glmresults_5 %>% arrange(grp)
 # 3 for child attr, 5 for child health, 4 for household
 "#475281","#74799B","#C4C8D7"
@@ -186,7 +189,7 @@ glmresults_5 <- glmresults_5 %>% arrange(grp)
 "#005a32", "#66AA3F", "#C0DF90", '#b4d0e6', '#90b5d5',  '#517eb0', '#35639b',  '#08306b', "#A90054", '#c30563',"#e80074", "#ff2994", "#ffa9d4", "#dd3162"
 
 glmresults_5 %>% filter(term != "tetabIndeterminate" & term != "Not available" & !grepl("Not available", term) & !grepl("issing", term)) %>% #arrange(grp) %>% 
-ggplot(aes(x=term, y=pd100)) +
+ggplot(aes(x=fct_rev(fct_reorder(term, desorder)), y=pd100)) +
   geom_hline(yintercept=0, linetype='dashed') +
   geom_pointrange(aes(x=fct_rev(fct_reorder(term, desorder)), y=pd100, ymin=pdcilow100, ymax=pdciup100), shape=15, size=0.8, color="black", show.legend=F, fatten=0.2, position=position_dodge2(width = 1.0) ) + 
   geom_point(shape=15, size=5, aes(color=variable), position=position_dodge2(width = 1.0) , show.legend=T) + #alpha=0.9 aes(color=variable)
@@ -204,13 +207,14 @@ ggplot(aes(x=term, y=pd100)) +
   #scale_alpha_discrete(range = c(0.35, 0.9))+
   #scale_x_continuous(trans = "reverse") + 
   labs(x="", y="Prevalence difference per 100 children") + 
-  theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
+  theme(axis.text.y = ggtext::element_markdown(color = "black", size = 14),
         axis.ticks.y=element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
         panel.grid.minor=element_blank()) +
   guides(color="none")
 
-ggsave("./Plots/fig3.png", width = 9, height = 9)
-ggsave("./Plots/fig3leg.png", width = 9, height = 9)
+ggsave("./Plots/fig2.png", width = 9, height = 9)
 
 colnames(glmresults_5)
 glmresults_5e <- glmresults_5 %>% mutate(pdsci = paste(round(pd100,1),' (',round(pdcilow100,1),', ', round(pdciup100,1),')', sep = "")) %>% 

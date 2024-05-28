@@ -178,7 +178,7 @@ drcprov0 = st_read("/Users/camillem/Documents/GitHub/hbv_hover/adm1/GLOBAL_ADM1.
 provlab <- read_excel("/Users/camillem/OneDrive - University of North Carolina at Chapel Hill/Epi PhD/IDEEL/HepB/Peyton K DHS/Results discussions/prov counts.xlsx", sheet = "provlabels")
 drcprov <- left_join(drcprov0, provlab, by = "ADM1_VIZ_N")
 
-drccities = st_read("/Users/camillem/Documents/GitHub/dhs_hbv/Data/cod_cities_20180906h/COD_CITIES_20180906H.shp", stringsAsFactors = FALSE) %>% filter(estimate20 > 200000 & name != "Kananga") %>%   st_transform(4326) # Mbuji-Mayi too close to Kananga
+drccities = st_read("/Users/camillem/Documents/GitHub/dhs_hbv/Data/cod_cities_20180906h/COD_CITIES_20180906H.shp", stringsAsFactors = FALSE) %>% filter(estimate20 > 200000 & name != "Kananga" & name != "Likasi") %>%   st_transform(4326) # Mbuji-Mayi too close to Kananga
 
 drcwat = st_read("/Users/camillem/Documents/GitHub/hbv_hover/COD_wat/COD_water_areas_dcw.shp", stringsAsFactors = FALSE)   %>% filter(HYC_DESCRI == "Perennial/Permanent" & NAME != "UNK") %>%  st_transform(4326) #%>% filter(NAME=="CONGO" | NAME == "LUALABA (CONGO)" | NAME == "OUBANGUI(UBANGI)")
 view(drcwat)
@@ -220,8 +220,9 @@ my_purd = brewer.pal(n = 9, "PuRd")[3:9] #there are 9, I exluded the two lighter
 my_greens = c("#EAF7E6","#BBE3B4","#41ae76", "#238b45","#00441b") #there are 9, I exluded the two lighter hues
 my_gregra = c("gray47","#BBE3B4","#41ae76", "#238b45","#00441b") #there are 9, I exluded the two lighter hues
 my_gregra6 = c("#F7F7F7","#EAF7E6",'#afddb3', '#72c18d', '#39a468', '#10632f', '#00441b') #there are 9, I exluded the two lighter hues
+my_gregra4 = c("#BBE3B4","#41ae76", "#238b45","#00441b") #there are 9, I exluded the two lighter hues
 
-A5 <- 
+#A5 <- 
   ggplot() + 
   geom_sf(data=admin0, fill="snow3", color="snow4") +
   geom_sf(data=DRC, fill="snow2") +
@@ -232,8 +233,8 @@ A5 <-
   geom_sf(data=output_points, aes(color=prev_grp_f, shape=as.factor(imputed))) + #, alpha=0.9
     geom_sf(data=drcwat, color="steelblue")+
     geom_sf(data=drccities, color = "black", shape = "18")+
-    geom_sf_text(data=drccities, aes(label = name), size = 3, fontface = "bold")+
-    labs(color='HBsAg positivity prevalence', shape = '') + 
+    geom_sf_text(data=drccities, aes(label = name), size = 4, fontface = "bold")+
+    labs(color='HBsAg-positivity prevalence', shape = '') + 
   scale_shape_discrete(labels = c("Original","Imputed"))+
   theme_bw(base_size=10) + 
   scale_color_manual(values = my_gregra)+
@@ -247,12 +248,14 @@ A5 <-
         axis.ticks=element_blank(), 
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
+        legend.text=element_text(size=11),
+        legend.title=element_text(size=11),
         #legend.text = element_text(size = 8),
         panel.background = element_rect(fill="#daeff8", color=NA))
 #        legend.position = c(.29, .16), # if want legend inside map outline
 #        legend.background = element_blank()
 A5
-ggsave("./Plots/prev5clust.png", width = 9, height = 6)
+ggsave("./Plots/prev5clust_pos.png", width = 9, height = 6)
 
 ### v for supp---------
 A5_sup <- 
@@ -703,7 +706,7 @@ mainprovs_m <- mainprovs_m %>% mutate(value_g = case_when(
   value_gf = factor(value_g,
                     levels = c(0,1,2,3,4,5,6),
                     labels = c("0%", "<1%","1%","2%", "3%","4%","5+%")))
-
+view(mainprovs)
 drcprov_sens <- left_join( drcprov[,c("hyphen", "geometry")], mainprovs_m, by="hyphen")
 view(drcprov)
 #prov_all <-
@@ -737,7 +740,7 @@ ggplot()+
 ggsave("./Plots/prov_all_vert.png", width = 6, height = 12)
 
 # original
-prov5 <-
+#prov5 <-
   ggplot()+
   geom_sf(data=admin0, fill="snow3", color="snow4") +
   geom_sf(data=drcprov_sens[drcprov_sens$variable=="prev5",],  mapping=aes(fill=value_gf))+
@@ -751,7 +754,7 @@ prov5 <-
   geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Tshopo",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = .3, size = 3) + #, fontface = "bold"
   geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.3, size = 3) + #, fontface = "bold"
   geom_sf_text(data= drcprov_agesex[drcprov_agesex$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 3) + #, fontface = "bold"
-  labs(fill="HBsAg positivity prevalence")+
+  labs(fill="HBsAg-positivity prevalence")+
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   theme(panel.grid.major = element_blank(), 
@@ -760,12 +763,14 @@ prov5 <-
         axis.ticks=element_blank(), 
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
+        legend.text=element_text(size=11),
+        legend.title=element_text(size=11),
         panel.background = element_rect(fill="#daeff8", color=NA),
         #legend.text = element_text(size = 8),
         #legend.title = element_text(size = 8)
         )
 prov5
-ggsave("./Plots/kidprev_wtdall_f.png", width = 6, height = 6)
+ggsave("./Plots/kidprev_wtdall_f.png", width = 9, height = 6)
 
 ##Main maps together---------
 A5 + prov5 + plot_layout(nrow=1, ncol = 2) + plot_annotation(tag_levels = 'A')

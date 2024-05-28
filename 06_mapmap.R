@@ -183,7 +183,7 @@ sexprov5tp <- sexprov5tp %>% mutate(
   pd_lci = 100*((p1 - p2) - 1.96*sq_term),
   pd_uci = 100*((p1 - p2) + 1.96*sq_term))
 
-colnames(sexprov5tp)
+view(sexprov5tp)
 
 sexprov5tp$hyphen <- gsub("prov2015", "", sexprov5tp$level)
 
@@ -207,7 +207,7 @@ sexprov5tpm <- sexprov5tp %>% mutate(
     pd > 8  ~ 11), # boys with 8 more
   pdsex_gf = factor(pdsex_g,
                     levels = c(0,1,2,3,4,5,6,7,8,9,10,11),
-                    labels = c("Girls 2+ more", "Girls 1 more",  "No difference (0% prev in both)", "No difference (prev >0%)", "Boys 1 more", "Boys 2 more"  ,"Boys 3 more", "Boys 4 more", "Boys 5 more", "Boys 6 more", "Boys 7+ more", "Boys 8+ more")))
+                    labels = c("≥2 more cases in girls", "1 more case in girls",  "No difference (0% prev in both)", "No difference (prev >0%)", "1 more case in boys", "2 more cases in boys"  ,"3 more cases in boys", "4 more cases in boys", "5 more cases in boys", "6 more cases in boys", "≥7 more cases in boys", "≥8 more cases in boys")))
 table(sexprov5tpm$pdsex_g, useNA = "always") # need 2 orange for girls, 1 white, 5 purple for boys
 
 sexprov5tpm %>% 
@@ -216,7 +216,7 @@ sexprov5tpm %>%
   geom_hline(yintercept=0, linetype='dashed') +
   geom_pointrange(aes(x=hyphen, y=pd, ymin=pd_lci, ymax=pd_uci), shape=15, size=0.8, color="black", show.legend=T, fatten=0.2, position=position_dodge2(width = 0.5) ) + 
   geom_point(shape=15, size=5, aes(color=pdsex_gf, group=pdsex_gf), position=position_dodge2(width = 0.5) , show.legend=T) + #alpha=0.9
-  scale_color_manual(values = sexpuor)+
+  scale_color_manual(values = sexpuor3)+
   #scale_color_brewer(palette = "Dark2")+
   coord_flip() + theme_bw() +
   #  scale_alpha_discrete(range = c(0.35, 0.9))+
@@ -224,8 +224,11 @@ sexprov5tpm %>%
   labs(x="", y="HBsAg-positivity prevalence difference by province: Boys vs girls") + 
   theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
         axis.ticks.y=element_blank(),
-        panel.grid.minor=element_blank())
-+ guides(color="none")
+        panel.grid.minor=element_blank(),
+        legend.title = element_blank(),
+        legend.text=element_text(size=11))
+#+ guides(color="none")
+# guides(color=guide_legend(title = "Differences in HBsAg-positivity prevalence\nby sex, per 100 children"))
 ggsave('./Plots/provsexpd_forest.png', width=9, height=6)
 
 
@@ -237,27 +240,35 @@ brewer.pal(n = 9, "PuOr")[1:9] #there are 9, I exluded the two lighter hues
 c('#e08214', '#e68d29', '#ec993b', '#f2a44d', '#f7b05f', '#fabb72', '#fdc787', '#ffd49e', "#F7F7F7",'#a49bc8', '#988bbe', '#8c7bb4', '#806aab', '#755aa2', '#6a4a99', '#5f3990', '#542788' )
 c('#e08214',  '#fdc787', '#fdc787',  "lightgray", "#F7F7F7",'#a49bc8', '#988bbe', '#8c7bb4', '#806aab', '#755aa2', '#6a4a99', '#5f3990', '#542788' )
 sexpuor <- c('#f7b05f', '#ffd49e', "snow4","seashell2",'#a49bc8', '#8c7bb4', '#755aa2', '#6a4a99','#542788' )
+sexpuor2 <- c('#f7b05f', '#ffd49e', "snow4","seashell1", "#DADAEB","#9E9AC8", '#8c7bb4', '#806aab', '#6a4a99')# '#755aa2',
+sexpuor3 <- c('#f7b05f', '#ffd49e', "snow4","seashell2", "#DADAEB","#9E9AC8", '#8c7bb4', '#806aab', '#6a4a99')# '#755aa2',
 
-sexpds <-
+brewer.pal(n=9, "Purples")
+c("#FCFBFD" "#EFEDF5" "#DADAEB" "#BCBDDC" "#9E9AC8" "#807DBA" "#6A51A3" "#54278F" "#3F007D")
+display.brewer.all()
+#sexpds <-
   ggplot()+
   geom_sf(data=admin0, fill="snow3", color="snow4") +
   geom_sf(data=drcprovpdsex_sf,  mapping=aes(fill=pdsex_gf))+
    geom_sf_text(data=drcprovpdsex_sf[drcprovpdsex_sf$pdsex_g != 2 & drcprovpdsex_sf$pdsex_g != 3 & drcprovpdsex_sf$hyphen!="Kasai-Oriental" & drcprovpdsex_sf$hyphen!="Kasai-Central" & drcprovpdsex_sf$hyphen!="Lomami" ,], 
-                mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 3, fontface = "bold") + 
-  geom_sf_text(data= drcprovpdsex_sf[drcprovpdsex_sf$pdsex_g != 2 & drcprovpdsex_sf$pdsex_g != 3 & drcprovpdsex_sf$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .5, size = 3, fontface = "bold") + 
-  geom_sf_text(data= drcprovpdsex_sf[drcprovpdsex_sf$pdsex_g != 2 & drcprovpdsex_sf$pdsex_g != 3 & drcprovpdsex_sf$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = 0, size = 3, fontface = "bold") + 
-  geom_sf_text(data= drcprovpdsex_sf[drcprovpdsex_sf$pdsex_g != 2 & drcprovpdsex_sf$pdsex_g != 3  & drcprovpdsex_sf$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 3, fontface = "bold") + 
-  scale_fill_manual(values = sexpuor)+
+                mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 3) + #, fontface = "bold"
+  geom_sf_text(data= drcprovpdsex_sf[drcprovpdsex_sf$pdsex_g != 2 & drcprovpdsex_sf$pdsex_g != 3 & drcprovpdsex_sf$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .5, size = 3) + 
+  geom_sf_text(data= drcprovpdsex_sf[drcprovpdsex_sf$pdsex_g != 2 & drcprovpdsex_sf$pdsex_g != 3 & drcprovpdsex_sf$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = 0, size = 3) + 
+  geom_sf_text(data= drcprovpdsex_sf[drcprovpdsex_sf$pdsex_g != 2 & drcprovpdsex_sf$pdsex_g != 3  & drcprovpdsex_sf$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 3) + 
+  scale_fill_manual(values = sexpuor2)+
   theme_bw(base_size=10) + 
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) +
-  labs(fill = "Differences in HBsAg positivity by sex,\nper 100 children", x='', y='')+
+  labs(fill = "Differences in HBsAg-positivity prevalence\nby sex, per 100 children", x='', y='')+
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
         axis.ticks=element_blank(), 
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
-        panel.background = element_rect(fill="#daeff8", color=NA))
+        panel.background = element_rect(fill="#daeff8", color=NA),
+        legend.title = element_blank(),
+        legend.text=element_text(size=12))
+    
 ggsave('./Plots/provsexpd.png', width=9, height=6)
 
 ## prevalence for boys and girls-----
@@ -304,6 +315,107 @@ ggplot()+
         panel.background = element_rect(fill="#daeff8", color=NA))+
   facet_wrap(~factor(variable, levels = c("girlsp", "boysp"), labels = c("Girls (n=2,855)", "Boys (n=2,917)")))
 ggsave('./Plots/provsexprevs.png', width=12, height=6)
+
+#Pf+ vs Pf- map------
+
+pfprov5 <- svyby(~prov2015,~hbvresult5+pfmalaria, designf, svytotal, na.rm=T, survey.lonely.psu="adjust")  %>% rownames_to_column(var = "level")
+pfprov5 <- pfprov5 %>% mutate(level = paste0('hbv', level))
+pfprov5t <- as.data.frame(t(as.data.frame(pfprov5))) %>% rownames_to_column(var = "prov") %>% row_to_names(row = 1) %>% filter(grepl("prov2015", level) & !grepl("se\\.", level))
+pfprov5t <- pfprov5t %>% mutate(across(-c(level), as.numeric))
+# calc prevs
+
+pfprov5tp <- pfprov5t %>% mutate(
+  pfpos_p = 100*(`hbv1.Pf-positive`/(`hbv0.Pf-positive` + `hbv1.Pf-positive`)),
+  pfneg_p = 100*(`hbv1.Pf-negative`/(`hbv0.Pf-negative` + `hbv1.Pf-negative`)),
+  pd = pfpos_p - pfneg_p)
+
+#add CIs for each prov PD
+pfprov5tp <- pfprov5tp %>% mutate(
+  n1 = `hbv1.Pf-positive` + `hbv0.Pf-positive`, # total count of boys
+  n2 = `hbv1.Pf-negative` + `hbv0.Pf-negative`, # total count of girls
+  p1 = pfpos_p/100,
+  p2 = pfneg_p/100,
+  term_undersq = case_when(
+    pfpos_p == 0 & pfneg_p == 0 ~ 0, #both reactive and nonreactive proportions are zero
+    #boysp == 0 & girlsp != 0 ~ (0+(p2*(1-p2)/n2)),
+    TRUE ~ (p1*(1-p1)/n1)+(p2*(1-p2)/n2)),
+  sq_term = sqrt(term_undersq),
+  pd_lci = 100*((p1 - p2) - 1.96*sq_term),
+  pd_uci = 100*((p1 - p2) + 1.96*sq_term))
+
+view(pfprov5tp)
+
+pfprov5tp$hyphen <- gsub("prov2015", "", pfprov5tp$level)
+
+#sexprov5tpm <- sexprov5tp %>%  select(c(hyphen, boysp,girlsp, pd)) #%>% melt()
+pfprov5tp %>% group_by(pd) %>% count() %>% print(n=Inf)
+# group prev diffs
+pfprov5tp <- pfprov5tp %>% mutate(
+  pd_g = case_when(
+    pd < -3 ~ 0, #Pf neg 3+ more infections
+    pd >= -3  & pd < -2 ~ 1, # Pf neg 2+ more infections
+    pd >= -2  & pd < -1 ~ 2, # Pf neg 2+ more infections
+    pfpos_p == 0 & pfneg_p == 0 ~ 3, # DISTINGUISH no diff and prev was zero
+    pd >= -1 & pd < 1  & (pfpos_p != 0 | pfneg_p != 0) ~ 4, # DISTINGUISH no diff and prev was zero vs no diff but prev >0
+    pd >= 1  & pd < 2 ~ 5, # Pf pos 1 more
+    pd >= 2  & pd < 3 ~ 6, #Pf pos 2 more
+    pd >= 3  & pd < 4 ~ 7, # Pf pos 3 more
+    pd >= 4  ~ 8), #Pf pos 4 more 
+ # boys with 8 more
+  pd_gf = factor(pd_g,
+                    levels = c(0,1,2,3,4,5,6,7,8),
+                    labels = c("≥3 more cases among Pf-neg", "2 more cases among Pf-neg", "1 more cases among Pf-neg",  "No difference (0% prev in both)", "No difference (prev >0%)", "1 more case among Pf-pos", "2 more cases among Pf-pos"  ,"3 more cases among Pf-pos", "≥4 more cases among Pf-pos")))
+table(pfprov5tp$pd_gf, useNA = "always") # need 2 orange for girls, 1 white, 5 purple for boys
+
+n11colorpigr <- c("#c51b7d", "#de77ae", "#f1b6da","snow4", "seashell2","#e6f5d0", "#b8e186", "#7fbc41", "#4d9221", "#276419")
+sexpuor3 <- c('#f7b05f', '#ffd49e', "snow4","seashell2", "#DADAEB","#9E9AC8", '#8c7bb4', '#806aab', '#6a4a99')# '#755aa2',
+brewer.pal(n = 11, name = "BrBG")
+n9brteal <- c("#8C510A","#BF812D", "#DFC27D", "snow4", "seashell2", "#80CDC1", "#35978F", "#01665E","#003C30")
+n9brteal_r <- c( "#01665E","#35978F", "#80CDC1", "snow4", "seashell2","#DFC27D", "#BF812D",   "#8C510A","#543005" )
+
+ "#8C510A" "#BF812D" "#DFC27D" "#F6E8C3" "#F5F5F5" "#C7EAE5" "#80CDC1" "#35978F" "#01665E" "#003C30"
+
+pfprov5tp %>% 
+  mutate(hyphen = reorder(hyphen, pd)) %>% 
+  ggplot(aes(x=hyphen, y=pd)) +
+  geom_hline(yintercept=0, linetype='dashed') +
+  geom_pointrange(aes(x=hyphen, y=pd, ymin=pd_lci, ymax=pd_uci), shape=15, size=0.8, color="black", show.legend=T, fatten=0.2, position=position_dodge2(width = 0.5) ) + 
+  geom_point(shape=15, size=5, aes(color=pd_gf, group=pd_gf), position=position_dodge2(width = 0.5) , show.legend=T) + #alpha=0.9
+  scale_color_manual(values = n9brteal_r)+
+  #scale_color_brewer(palette = "Dark2")+
+  coord_flip() + theme_bw() +
+  #  scale_alpha_discrete(range = c(0.35, 0.9))+
+  #scale_x_continuous(trans = "reverse") + 
+  labs(x="", y="HBsAg-positivity prevalence difference by province: Pf-pos vs Pf-neg") + 
+  theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
+        axis.ticks.y=element_blank(),
+        panel.grid.minor=element_blank(),
+        legend.title = element_blank(),
+        legend.text=element_text(size=11))
+
+drcprovpdpf_sf <- left_join( drcprov[,c("hyphen", "geometry")], pfprov5tp, by="hyphen")
+
+ggplot()+
+  geom_sf(data=admin0, fill="snow3", color="snow4") +
+  geom_sf(data=drcprovpdpf_sf,  mapping=aes(fill=pd_gf))+
+  geom_sf_text(data=drcprovpdpf_sf[drcprovpdpf_sf$pdsex_g != 2 & drcprovpdpf_sf$pdsex_g != 3 & drcprovpdpf_sf$hyphen!="Kasai-Oriental" & drcprovpdpf_sf$hyphen!="Kasai-Central" & drcprovpdpf_sf$hyphen!="Lomami" ,], 
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 3) + #, fontface = "bold"
+  geom_sf_text(data= drcprovpdpf_sf[drcprovpdpf_sf$pdsex_g != 2 & drcprovpdpf_sf$pdsex_g != 3 & drcprovpdpf_sf$hyphen=="Kasai-Central",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .5, size = 3) + 
+  geom_sf_text(data= drcprovpdpf_sf[drcprovpdpf_sf$pdsex_g != 2 & drcprovpdpf_sf$pdsex_g != 3 & drcprovpdpf_sf$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = 0, size = 3) + 
+  geom_sf_text(data= drcprovpdpf_sf[drcprovpdpf_sf$pdsex_g != 2 & drcprovpdpf_sf$pdsex_g != 3  & drcprovpdpf_sf$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 3) + 
+  scale_fill_manual(values = n9brteal_r)+
+  theme_bw(base_size=10) + 
+  scale_x_continuous(limits=c(12,31)) + 
+  scale_y_continuous(limits=c(-13.5,5.4)) +
+  labs(fill = "Differences in HBsAg-positivity prevalence\nby Pf status, per 100 children", x='', y='')+
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.ticks=element_blank(), 
+        axis.text.x=element_blank(), 
+        axis.text.y=element_blank(),
+        panel.background = element_rect(fill="#daeff8", color=NA),
+        legend.title = element_blank(),
+        legend.text=element_text(size=12))
 
 
 #chart of prevs over time-----
@@ -485,9 +597,8 @@ provtet5t <- provtet5t %>% mutate(
     pdtet > 2  ~ 8),
   pdtet_gf = factor(pdtet_g,
                     levels = c(0,1,2,3,4,5,6,7,8),
-                    labels = c("Tetanus sero-neg 5+ more", "Tetanus sero-neg 4 more",  "Tetanus sero-neg 3 fewer", "Tetanus sero-neg 2 more", "Tetanus sero-neg 1 more"  ,"No difference (prev 0% in both)", "No difference (prev >0%)","Tetanus sero-pos 1 more", "Tetanus sero-pos 2+ more")))
-colnames(provtet5t)
-sqrt(((provtet5t$Reactive_p/100)*(1-(provtet5t$Reactive_p/100))/provtet5t$hbv1.Reactive)+((provtet5t$Nonreactive_p/100)*(1-(provtet5t$Nonreactive_p/100))/provtet5t$hbv1.Nonreactive))
+                    labels = c("≥5 more among Tet Ab-neg", "4 more among Tet Ab-neg",  "3 more among Tet Ab-neg", "2 more among Tet Ab-neg", "1 more among Tet Ab-neg"  ,"No difference (prev 0% in both)", "No difference (prev >0%)","1 more among Tet Ab-pos", "≥2 more among Tet Ab-pos")))
+table(provtet5t$pdtet_gf)
 
 provtet5t <- provtet5t %>% mutate(
   n1 = hbv1.Reactive + hbv0.Reactive, # total count of seropositives
@@ -501,8 +612,25 @@ provtet5t <- provtet5t %>% mutate(
   sq_term = sqrt(term_undersq),
   pdtet_lci = 100*((p1 - p2) - 1.96*sq_term),
   pdtet_uci = 100*((p1 - p2) + 1.96*sq_term))
+view(provtet5t)
 table(provtet5t$pdtet_gf)
 
+n11colorpigr <- c("#8e0152", "#c51b7d", "#de77ae", "#f1b6da", "#fde0ef", "#f7f7f7", "#e6f5d0", "#b8e186", "#7fbc41", "#4d9221", "#276419")
+n11colorrdbl <- c('#93003a', '#c52a52', '#e75d6f', '#fd9291', '#ffcab9', '#ffffe0', '#b1dfdb', '#85b7ce', '#618fbf', '#3e67ae', '#00429d')
+n11colorblrd <- c('#00429d', '#3e67ae', '#618fbf', '#85b7ce', '#b1dfdb',"snow2", '#ffffe0', '#ffcab9', '#fd9291','#e75d6f',  '#c52a52', '#93003a')
+blrd10m <- c('#00429d', '#3e67ae', '#618fbf', '#85b7ce', '#b1dfdb',"snow4","seashell1", '#fd9291','#e75d6f',  '#c52a52', '#93003a')
+blrd10g <- c('#00429d', '#3e67ae', '#618fbf', '#85b7ce', '#b1dfdb',"snow4","seashell2", '#fd9291','#e75d6f',  '#c52a52', '#93003a')
+
+
+blrd10m <- c("#08519C",  "#2171B5", "#6BAED6",  "#9ECAE1" , "#C6DBEF","snow4","seashell1", '#fd9291','#e75d6f',  '#c52a52', '#93003a')
+blrd10g <- c("#08519C", "#2171B5", "#6BAED6",  "#9ECAE1" , "#C6DBEF", "snow4","seashell2",  '#ffcab9','#fd9291','#e75d6f',  '#c52a52', '#93003a')
+
+'#93003a', '#c52a52', '#e75d6f', '#fd9291', '#ffcab9', '#ffffe0', '#d6d6d4', '#adaec7', '#8387b9', '#5563ab', '#00429d'
+brewer.pal(n = 9, "Blues") #there are 9, I exluded the two lighter hues
+brewer.pal(n = 9, "RdBu") #there are 9, I exluded the two lighter hues
+"#F7FBFF" "#DEEBF7" "#C6DBEF" "#9ECAE1" "#6BAED6" "#4292C6" "#2171B5" "#08519C" "#08306B"
+"#D73027" "#F46D43" "#FDAE61" "#FEE090" "#FFFFBF" "#E0F3F8" "#ABD9E9" "#74ADD1" "#4575B4"
+"#B2182B" "#D6604D" "#F4A582" "#FDDBC7" "#F7F7F7" "#D1E5F0" "#C6DBEF","#92C5DE" "#4393C3" "#2166AC"
 #forest plot
 provtet5t %>% 
   mutate(hyphen = reorder(hyphen, pdtet)) %>% 
@@ -510,7 +638,7 @@ provtet5t %>%
   geom_hline(yintercept=0, linetype='dashed') +
   geom_pointrange(aes(x=hyphen, y=pdtet, ymin=pdtet_lci, ymax=pdtet_uci), shape=15, size=0.8, color="black", show.legend=T, fatten=0.2, position=position_dodge2(width = 0.5) ) + 
   geom_point(shape=15, size=5, aes(color=pdtet_gf, group=pdtet_gf), position=position_dodge2(width = 0.5) , show.legend=T) + #alpha=0.9
-  scale_color_manual(values = blrd10)+
+  scale_color_manual(values = blrd10g)+
   #scale_color_brewer(palette = "Dark2")+
   coord_flip() + theme_bw() +
   #  scale_alpha_discrete(range = c(0.35, 0.9))+
@@ -518,32 +646,28 @@ provtet5t %>%
   labs(x="", y="HBsAg-positivity prevalence difference by province: Tetanus seropositive vs seronegative") + 
   theme(axis.text.y = ggtext::element_markdown(color = "black", size = 11),
         axis.ticks.y=element_blank(),
-        panel.grid.minor=element_blank())
+        panel.grid.minor=element_blank(),
+        legend.title = element_blank())
 + guides(color="none")
-ggsave('./Plots/provtetpd_forest.png', width=9, height=6)
+ggsave('./Plots/provtetpd_forest2.png', width=9, height=6)
 
 
 colnames(provtet5t)
 
-n11colorpigr <- c("#8e0152", "#c51b7d", "#de77ae", "#f1b6da", "#fde0ef", "#f7f7f7", "#e6f5d0", "#b8e186", "#7fbc41", "#4d9221", "#276419")
-n11colorrdbl <- c('#93003a', '#c52a52', '#e75d6f', '#fd9291', '#ffcab9', '#ffffe0', '#b1dfdb', '#85b7ce', '#618fbf', '#3e67ae', '#00429d')
-n11colorblrd <- c('#00429d', '#3e67ae', '#618fbf', '#85b7ce', '#b1dfdb',"snow2", '#ffffe0', '#ffcab9', '#fd9291','#e75d6f',  '#c52a52', '#93003a')
-blrd10 <- c('#00429d', '#3e67ae', '#618fbf', '#85b7ce', '#b1dfdb',"snow4","palegoldenrod", '#fd9291','#e75d6f',  '#c52a52', '#93003a')
-
 provtet5t$hyphen <- gsub("prov2015", "", provtet5t$level)
 drcprov_tet <- left_join( drcprov[,c("hyphen", "geometry")], provtet5t, by="hyphen")
 
-provtet<-
+#provtet<-
   ggplot()+
   geom_sf(data=admin0, fill="snow3", color="snow4") +
   geom_sf(data=drcprov_tet,  mapping=aes(fill=pdtet_gf))+
   geom_sf_text(data= drcprov_tet[drcprov_tet$pdtet_g != 5 & drcprov_tet$pdtet_g != 6 & drcprov_tet$hyphen!="Kasai-Oriental" & drcprov_tet$hyphen!="Kasai-Central" & drcprov_tet$hyphen!="Lomami" ,], 
-               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 3, fontface = "bold") + 
-  geom_sf_text(data= drcprov_tet[drcprov_tet$pdtet_g != 5 & drcprov_tet$pdtet_g != 6 & drcprov_tet$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 3, fontface = "bold") + 
-  geom_sf_text(data= drcprov_tet[drcprov_tet$pdtet_g != 5 & drcprov_tet$pdtet_g != 6 & drcprov_tet$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 3, fontface = "bold") + 
-  scale_fill_manual(values = n11colorblrd)+
+               mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.1, nudge_y = -.1, size = 3) + 
+  geom_sf_text(data= drcprov_tet[drcprov_tet$pdtet_g != 5 & drcprov_tet$pdtet_g != 6 & drcprov_tet$hyphen=="Kasai-Oriental",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = -0.025, nudge_y = .3, size = 3) + 
+  geom_sf_text(data= drcprov_tet[drcprov_tet$pdtet_g != 5 & drcprov_tet$pdtet_g != 6 & drcprov_tet$hyphen=="Lomami",], mapping=aes(label = hyphen, geometry = geometry), nudge_x = 0.5, nudge_y = 1, size = 3) + 
+  scale_fill_manual(values = blrd10m)+
   theme_bw(base_size=10) + 
-  labs(fill = "Differences in HBsAg positivity by tetanus serostatus,\nper 100 children", x='',y='')+ # legend title if wanted HBsAg infections per 100 children comparing\nReactive vs nonreactive tetanus antibodies
+  labs(fill = "Differences in HBsAg positivity by tetanus serostatus,\ncases per 100 children", x='',y='')+ # legend title if wanted HBsAg infections per 100 children comparing\nReactive vs nonreactive tetanus antibodies
   scale_x_continuous(limits=c(12,31)) + 
   scale_y_continuous(limits=c(-13.5,5.4)) + 
   theme(panel.grid.major = element_blank(), 
@@ -551,11 +675,12 @@ provtet<-
         axis.ticks=element_blank(), 
         axis.text.x=element_blank(), 
         axis.text.y=element_blank(),
-        #legend.text = element_text(size = 8),
-        #legend.title = element_text(size = 8),
+        legend.text=element_text(size=12),
+        #legend.position = "none",
+        legend.title = element_text(size = 12),
         panel.background = element_rect(fill="#daeff8", color=NA))#+
 provtet
-ggsave('./Plots/provtet_apr.png', width=12, height=6)
+ggsave('./Plots/provtet_map.png', width=9, height=6) # check dimensions depending on if legend outputted
 
 # combine from 06_mapping.R, see below for 4 including DPT
 A5 + prov5 + provtet + plot_layout(nrow=1, ncol = 3) + plot_annotation(tag_levels = 'A')
