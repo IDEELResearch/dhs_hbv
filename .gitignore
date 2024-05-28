@@ -6,6 +6,9 @@
 /Data/
 *.xlsx
 
+# Old code 
+/Files not public/
+
 # Session Data files
 .RData
 .RDataTmp
