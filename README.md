@@ -1,5 +1,7 @@
 # dhs_hbv
- 
+```
+This project analyses survey and biospecimen data from the 2013-14 Demographic and Health Survey (DHS) in the Democratic Republic of Congo to describe the epidemiology of hepatitis B virus across the country. Survey data are publicly available upon request from the DHS Program. Biospecimen data were tested for the presence of hepatitis B surface antigen, results for which have been provided to the DHS Program. The code in this Github repo were used for this analysis.
+``` 
 # https://rstudio.github.io/renv/index.html
 
 # Project uses renv:
