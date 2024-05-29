@@ -1,25 +1,27 @@
-# 01_datacleaning_rev.R
+# 01_datacleaning.R
 
 # renv setup--------
 #install.packages("renv")
 renv::init()
 
-# after updating R, run:
-install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE) 
-renv::restore(exclude = "INLA")
-inla.upgrade() # for the stable version 
-library(INLA) 
 # Load packages---------
-install.packages("here")
 library(tidyverse)
 library(foreign)
 library(here)
+library(srvyr)
+library(survey)
+
 #Codebooks info------
-# from DHS website, download CDKR61FL.DO and CDPR61FL.DO (or the DO files for other datasets of interest). Open these in a text editor (DO files are executable Stata code files), and control-F search for the variable labels and values
+# The files used in this analyses were CDKR61FL.DO (kids recode file) and CDPR61FL.DO (household member recode file), as well as hepatitis B surface antigen results (which have been provided to the DHS Program)
+# After making an account and submitting a request for data to the DHS Program, download the CDKR61FL and CDPR61FL files.
+# The Stata DO files were downloaded to use as codebooks to obtain the variable name/response options. These can be opened in a text editor (DO files are executable Stata code files) to view the variable labels and values.
 
 #Children data----------
-CDOB61FL <- read.dta(here("Data", "CDOB61FL", "POLIO RESULTS CDC 12MAY2018.DTA"), convert.factors = FALSE)
+# CDOB61FL <- read.dta(here("Data", "CDOB61FL", "POLIO RESULTS CDC 12MAY2018.DTA"), convert.factors = FALSE) # other data not used in this analysis
 cdpr61dt <- read.dta(here("Data","CDPR61DT", "CDPR61FL.DTA"), convert.factors = FALSE)
+dhsmeta <- cdpr61dt # R data name used below
+
+# In addition to the hepB outcome variable, Plasmodium falciparum PCR results (variable pfldh_kids) have been previously provided to the DHS Program.
 
 #kids recode file with additional questions for a subset of children
 d_k_or <- read.dta(here("Data","CDKR61DT","CDKR61FL.DTA"), convert.factors = FALSE)
@@ -53,8 +55,8 @@ dhsmeta %>% filter(hv027==1 &  hv105 < 6 & (hc1>=6 | is.nan(hc1)) & sh310a == 1)
 
 # subset data frame 
 dhsmeta <- dhsmeta %>% mutate_at(c('hv027', 'hc1', 'sh310a', 'hv103'), as.numeric) 
-# elig_kids....and subsequent datasets includes eligibility on consent and de factor whereas
-# elig_kids_2 and subsequent datasets applies propensity score to top level of all children selected
+# elig_kids....and subsequent datasets includes eligibility on consent and de factor (subpart on flowchart) whereas
+# elig_kids_2 and subsequent datasets applies propensity score to top level of all children selected (representative of all children in households selected for survey)
 elig_kids <- dhsmeta %>% filter(hv027==1 & (hc1 >= 6 & hc1<=59) & sh310a == 1 & hv103==1) # %>% select(cluster_hh, hv001, hv002, hvidx, kids_barcode, hv105, hv104, hc1, hv270, pfldh_kids,
                                                                                           #           hv005, hv006, hv024, shnprovin, hv025, hv040, hv201, hv106, hv246, hml1, hml10, hml20, hv027, hv028)
 #weight up to full n=8547 with propensity score
@@ -64,11 +66,6 @@ elig_kids_2 <- dhsmeta %>% filter(hv027==1 & (hc1 >= 6 & hc1<=59)) #%>% select(c
 # if subsetting kids from cdpr61dt: elig_kids$kids_barcode <- tolower(elig_kids$sh312)
 
 # add hbv results 
-elig_kids <- elig_kids %>% mutate(validbarcode = case_when(
-  grepl("9999", elig_kids$kids_barcode) ~ 0, ## 99993  Sample damaged/insufficient/not found in lab # 99994  Not present # 99995  Refused # 99996  Other
-  grepl("\\?", elig_kids$kids_barcode) ~ 0,
-  TRUE ~ 1
-))
 elig_kids_2 <- elig_kids_2 %>% mutate(validbarcode = case_when(
   grepl("9999", elig_kids_2$kids_barcode) ~ 0, ## 99993  Sample damaged/insufficient/not found in lab # 99994  Not present # 99995  Refused # 99996  Other
   grepl("\\?", elig_kids_2$kids_barcode) ~ 0,
@@ -77,7 +74,6 @@ elig_kids_2 <- elig_kids_2 %>% mutate(validbarcode = case_when(
 table(barcode = elig_kids_2$validbarcode, consent =elig_kids_2$sh310a, useNA = "always")
 
 # propensity score code to address missingness-----------
-## see spring 2022 EPID 722 exercise 4 (starting at q6)
 
 # indicator variable for barcode analyzed or not, has pf result, pf+/pf-/no pf result - children 6-59mo
 elig_kids_2 <- elig_kids_2 %>% mutate(bc_select = case_when( # exchange between elig_kids_2 (n=8547) and elig_kids (n=8182)
@@ -116,7 +112,7 @@ elig_kids_2 <- elig_kids_2 %>% mutate(bc_select = case_when( # exchange between 
     hv101 == "5" ~ "Grandchild", # grandchild
     TRUE ~ "Other") # all others since so few counts in each
   )
-
+# data checks
 table(elig_kids_2$pf_posvsoth, useNA = "always")
 table(elig_kids_2$hc1, useNA = "always")
 table(elig_kids_2$hv105, useNA = "always")
@@ -125,7 +121,7 @@ table(elig_kids_2$sh310a_nano, useNA = "always")
 table(elig_kids_2$hv026, elig_kids_2$hv025,useNA = "always")
 table(elig_kids_2$hv101, useNA = "always")
 
-#ps with full barcodes/dataset
+#propensity score with full barcodes/dataset
 ## vars of prop score: hv006 - month of interview; shnprovin - province (try hv024, the pre-2015 provinces, if rank deficient warning affects);
 ## hv026 - capital/city/town/countryside, more specific than hv025 - urban/rural; hv040 - cluster altitude in meters; hv104 - sex; hv201 - source of drinking water; hv106 - education (delete for kids?);
 ## hv246 - owns livestock; hml1 - mosquito nets; hml10 - insecticide treated net; hml20 - slept under net; hv270 - hh wealth; hv105 - age
@@ -133,10 +129,9 @@ table(elig_kids_2$hv101, useNA = "always")
 selectioninstudy <- glm(bc_select ~ shnprovin + hv026 + hv104 + hv270 + hv105_fromhc1 + pf_posvsoth +  hv103 + reltoheadhh_simp, #check removing: +hml10+hml20; removed: hv106 (education), hml1 (has net), hv201 (water)
                         data=elig_kids_2,
                         family=binomial("logit"))
-summary(selectioninstudy$coefficients) # vary significantly - more work into what should be included
-# getting warning about rank deficiency
+summary(selectioninstudy$coefficients) #view
 
-# denom of weights
+# denominator of weights
 elig_kids_2$d <- predict(selectioninstudy, elig_kids_2, type = "response")
 summary(elig_kids_2$d)
 # numerator of weights
@@ -165,25 +160,15 @@ summary(elig_kids_2$iptw_s) # standardized weights from Hillary
 elig_kids_2 %>% 
   ggplot() + geom_histogram(aes(x=iptw_s)) + facet_wrap(~bc_select, nrow = 2)
 
-# Q to confirm - once subsetted into participants who are included, the weights will just not sum to 1, right? or does standardization take care of that
-test <- elig_kids %>% filter(kids_barcode %in% elig_kids_whbvres$kids_barcode) %>% select(c(kids_barcode, sw, iptw_s, bc_select))
-summary(test$sw)
-summary(test$iptw_s)
-mean(test$sw)
-
 # add hbv results onto this eligible kid df------
-elig_kids_wres <- left_join(elig_kids, kid_hbv_kr_dis[,c("kids_barcode", grep("hbv", names(kid_hbv_kr_dis), value=T))], by = "kids_barcode")
 elig_kids_2_wres <- left_join(elig_kids_2, kid_hbv_kr_dis[,c("kids_barcode", grep("hbv", names(kid_hbv_kr_dis), value=T))], by = "kids_barcode")
 
-elig_kids_wres %>% filter(validbarcode==1) %>%  group_by(hbvresult5) %>% count()
 elig_kids_2_wres %>% filter(validbarcode==1) %>%  group_by(hbvresult5) %>% count()
 
 # of these, final df with hbv results (subset to those with results)
-elig_kids_whbvres <- elig_kids_wres %>% filter(validbarcode==1 & !is.na(hbvresult5)) # make sure hbvresult5 has all results
 elig_kids_2_whbvres <- elig_kids_2_wres %>% filter(validbarcode==1 & !is.na(hbvresult5)) # make sure hbvresult5 has all results
 
 # of these, final df without hbv results
-nores <- elig_kids_wres %>% filter(is.na(hbvresult5) & validbarcode==1)
 nores2 <- elig_kids_2_wres %>% filter(is.na(hbvresult5) & validbarcode==1)
 
 # hbv results that aren't in final df (df per jan2024 committee discussion about starting with SURVEYED not SAMPLES)
@@ -197,11 +182,7 @@ table(nores2$pfldh_kids, useNA = "always")
 table(nores$pfldh_kids, useNA = "always")
 
 # distinct households
-elig_kids_whbvres %>% summarize(count_distinct = n_distinct(cluster_hh))
 elig_kids_2_whbvres %>% summarize(count_distinct = n_distinct(cluster_hh))
-
-# subsetting happens above, this merge no longer needed
-# elig_kids_whbvres_wt <- left_join(elig_kids_2_whbvres, elig_kids_2[,c("kids_barcode","iptw_s")], by ="kids_barcode")
 
 # elig_kids_whbvres_wt used below; since merge above no longer needed, change name here
 elig_kids_whbvres_wt <- elig_kids_2_whbvres
@@ -237,7 +218,7 @@ elig_kids_whbvres_wt$both_wt_new <- (elig_kids_whbvres_wt$iptw_s)*(elig_kids_whb
 summary(elig_kids_whbvres_wt$both_wt_old)
 summary(elig_kids_whbvres_wt$both_wt_new)
 #whether hv028 or hv005 is the household weight used, the summary of the weights is very similar, so results won't differ much
-#hv028 is the weight for households selected for the male subsample (hv027), which are the households in which children were selected for DBS testing - unclear online, using this one
+#hv028 is the weight for households selected for the male subsample (hv027), which are the households in which children were selected for DBS testing
 
 #New variables---------------
 ##Province collapsed------
@@ -525,8 +506,7 @@ elig_kids_whbvres_wt_kr %>% group_by(percpos, poskids) %>% count()
 elig_kids_whbvres_wt_kr$hv014 <- as.numeric(elig_kids_whbvres_wt_kr$hv014)
 elig_kids_whbvres_wt_kr$poskids <- as.factor(elig_kids_whbvres_wt_kr$poskids)
 
-# export for DHS program--------
-library(here)
+# export hbv results--------
 kidshbv <- elig_kids_whbvres_wt_kr %>% select(c(hv001, hv002, kids_barcode, hbvresult5, hbvresult1, hbvresult2, hbvresult100))
 write.csv(kidshbv, file = here("Data", "kidshbv.csv"))
 
