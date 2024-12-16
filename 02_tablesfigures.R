@@ -31,6 +31,7 @@ designf_dhs2 <-as_survey_design(designf)
 designhh <-svydesign(ids=elig_kids_whbvres_wt_kr$cluster_hh, strata=elig_kids_whbvres_wt_kr$hv022 , weights=elig_kids_whbvres_wt_kr$hv028_div,  data=elig_kids_whbvres_wt_kr)
 designhh2 <-as_survey_design(designhh)
 svymean(~hv009,designhh2, na.rm=T, survey.lonely.psu="adjust") #%>% clipr::write_clip()
+svyquantile(~hv009,designhh2,quantiles = c(0.25, 0.5,0.75), na.rm=T, survey.lonely.psu="adjust")
 
 # which HBV outcome var: main analysis is hbvresult5, hbvresultlow5, hbvresultlowpos5
 # sensitivity analyses: 1, 2, 100
@@ -72,6 +73,16 @@ kids_av <- as.data.frame(survmean_all("hv014")) %>% rownames_to_column(var = "co
 avgs_tot <- dplyr::bind_rows(list(age_av, hhmem_av, kids_av), .id = 'source') %>% mutate(Tab1tot = paste(round(mean,1),' (',round(se,2),')', sep = ""))
 Tab1_num_tot <- avgs_tot %>% select(-c(source, mean,se ))
 view(Tab1_num_tot)
+
+# medians for reference
+options(digits = 4)
+# hh members
+svyquantile(~hv009,designhh2,quantiles = c(0.25, 0.5,0.75), na.rm=T, survey.lonely.psu="adjust")
+# children
+svyquantile(~hv014,designhh2,quantiles = c(0.25, 0.5,0.75), na.rm=T, survey.lonely.psu="adjust")
+# age in months
+svyquantile(~hc1,designhh2,quantiles = c(0.25, 0.5,0.75), na.rm=T, survey.lonely.psu="adjust")
+
 
 ## cont data, by hbv----------
 age_av_by <- as.data.frame(survmean("hc1")) %>% rownames_to_column(var = "covname") %>% rename(mean = hc1) %>% mutate(cov = "hc1", levels = "Age (months), mean (SD)")
@@ -149,6 +160,7 @@ view(all_tot)
 # total counts
 tot <- as.data.frame(all_tot %>% group_by(source) %>% summarise(tot = sum(total))) %>% summarise(Tab1tot = median(tot))
 # weighted total is 5773, unweighted is 5679. ~100 more weighted; this makes sense as the mean weight (both_wt_new) is 1.016, increasing total by 1.6%
+
 
 ## hbv n, overall------
 tot$levels <- "Overall n"

@@ -395,17 +395,17 @@ elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate(
     h3 == 0 ~ 0, # did not receive DPT1 (reported as no and not on vac card)
     h3 == 8 ~ 0, # assign don't know as didn't receive
     h3 > 0 & h3 < 8 ~ 1, #h3==1 is vacc date on card, 2 is reported by mother, 3 is vacc on card
-    is.na(h3) ~ NA_real_), # these are the values to impute - need help on this
+    is.na(h3) ~ NA_real_), # per dhs report, these were not lumped with no vacc
   dpt2 = case_when(
-    h5 == 0 ~ 0, # did not receive DPT1 (reported as no and not on vac card)
+    h5 == 0 ~ 0, # did not receive DPT2 (reported as no and not on vac card)
     h5 == 8 ~ 0, # assign don't know as didn't receive
     h5 > 0 & h5 < 8 ~ 1, #h3==1 is vacc date on card, 2 is reported by mother, 3 is vacc on card
-    is.na(h5) ~ NA_real_), # these are the values to impute - need help on this
+    is.na(h5) ~ NA_real_), # per dhs report, these were not lumped with no vacc
   dpt3 = case_when(
-    h7 == 0 ~ 0, # did not receive DPT1 (reported as no and not on vac card)
+    h7 == 0 ~ 0, # did not receive DPT3 (reported as no and not on vac card)
     h7 == 8 ~ 0, # assign don't know as didn't receive
     h7 > 0 & h7 < 8 ~ 1, #h3==1 is vacc date on card, 2 is reported by mother, 3 is vacc on card
-    is.na(h7) ~ NA_real_), # these are the values to impute - need help on this
+    is.na(h7) ~ NA_real_), # per dhs report, these were not lumped with no vacc
   dpt_count = dpt1 + dpt2 + dpt3,
   dpt_doses = case_when(
     dpt_count==3 ~ 2, # reported or noted as received for all
@@ -431,6 +431,10 @@ elig_kids_whbvres_wt_kr %>% group_by(dpt1, dpt2, dpt3, dpt_count, dpt_doses) %>%
 elig_kids_whbvres_wt_kr %>% group_by(v477, injec) %>% count()
 elig_kids_whbvres_wt_kr %>% group_by(v744a, v744b, v744c, v744d, v744e, beat) %>% count() %>% print(n=Inf)
 elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% mutate(syringe = case_when(is.na(v480) ~ 0, !is.na(v480) ~ 1))
+elig_kids_whbvres_wt_kr %>% group_by(v477) %>% count() %>% print(n=Inf)
+elig_kids_whbvres_wt_kr %>% group_by(injec) %>% count() %>% print(n=Inf)
+elig_kids_whbvres_wt_kr %>% filter(is.na(v477)) %>%  group_by(syringe) %>% count() %>% print(n=Inf)
+elig_kids_whbvres_wt_kr %>% group_by(injec, v480) %>% count()
 
 # labels : relationship to head of hh
 elig_kids_whbvres_wt_kr <- elig_kids_whbvres_wt_kr %>% dplyr::mutate(
